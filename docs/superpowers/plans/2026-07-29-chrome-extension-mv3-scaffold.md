@@ -134,6 +134,7 @@ test('production build emits a permission-free Manifest V3 extension', () => {
   assert.equal(manifest.background.type, 'module')
   assert.ok(!Object.hasOwn(manifest, 'permissions'))
   assert.ok(!Object.hasOwn(manifest, 'host_permissions'))
+  assert.ok(!Object.hasOwn(manifest, 'content_scripts'))
 
   const referencedFiles = new Set([
     manifest.action.default_popup,
@@ -395,7 +396,6 @@ git commit -m "feat: scaffold Manifest V3 extension"
 
 **Files:**
 
-- Modify: `tests/scaffold.test.mjs`
 - Create: `.gitignore`
 - Create: `README.md`
 
@@ -405,50 +405,7 @@ git commit -m "feat: scaffold Manifest V3 extension"
 - Produces: documented install, development, build, type-check, test, and Load unpacked workflows.
 - Produces: ignore rules for dependencies, generated builds, logs, and macOS metadata.
 
-- [ ] **Step 1: Add the failing documentation test**
-
-Append to `tests/scaffold.test.mjs`:
-
-```js
-test('repository documents every supported workflow', () => {
-  const readme = readFileSync(resolve('README.md'), 'utf8')
-  const gitignore = readFileSync(resolve('.gitignore'), 'utf8')
-
-  for (const command of [
-    'npm install',
-    'npm run dev',
-    'npm run build',
-    'npm run typecheck',
-    'npm test',
-  ]) {
-    assert.match(readme, new RegExp(command.replaceAll(' ', '\\s+')))
-  }
-
-  assert.match(readme, /chrome:\/\/extensions/)
-  assert.match(readme, /Load unpacked/)
-  assert.match(readme, /dist\//)
-
-  for (const ignoredPath of ['node_modules/', 'dist/', '.DS_Store', '*.log']) {
-    assert.ok(
-      gitignore.split(/\r?\n/).includes(ignoredPath),
-      `${ignoredPath} must be ignored`,
-    )
-  }
-})
-```
-
-- [ ] **Step 2: Run the test and verify the red state**
-
-Run:
-
-```bash
-npm test
-```
-
-Expected: the two build tests pass and the documentation test fails because
-`README.md` does not exist.
-
-- [ ] **Step 3: Add repository ignore rules**
+- [ ] **Step 1: Add repository ignore rules**
 
 Create `.gitignore`:
 
@@ -459,7 +416,7 @@ dist/
 *.log
 ```
 
-- [ ] **Step 4: Write the usage documentation**
+- [ ] **Step 2: Write the usage documentation**
 
 Create `README.md`:
 
@@ -518,7 +475,7 @@ The Chat2TeX extension icon will appear in Chrome. Its popup contains only a
 scaffold status message.
 ```
 
-- [ ] **Step 5: Verify documentation and repository hygiene**
+- [ ] **Step 3: Verify documentation and repository hygiene**
 
 Run:
 
@@ -531,14 +488,14 @@ git status --short
 Expected:
 
 - Type checking exits 0.
-- The Node test runner reports 3 passing tests.
+- The Node test runner reports 2 passing tests.
 - `.DS_Store`, `node_modules/`, and `dist/` are absent from `git status`.
-- Only `.gitignore`, `README.md`, and `tests/scaffold.test.mjs` are uncommitted.
+- Only `.gitignore` and `README.md` are uncommitted.
 
-- [ ] **Step 6: Commit the documentation**
+- [ ] **Step 4: Commit the documentation**
 
 ```bash
-git add .gitignore README.md tests/scaffold.test.mjs
+git add .gitignore README.md
 git commit -m "docs: add extension setup guide"
 ```
 
@@ -579,6 +536,6 @@ Expected:
 
 - Type checking exits 0.
 - The production build succeeds.
-- The Node test runner reports 3 passing tests.
+- The Node test runner reports 2 passing tests.
 - `git diff --check` produces no output.
 - `git status --short` produces no output.
