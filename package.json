@@ -1,0 +1,17 @@
+{
+  "name": "chat2tex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "2.7.1",
+    "typescript": "7.0.2",
+    "vite": "8.1.5"
+  }
+}
