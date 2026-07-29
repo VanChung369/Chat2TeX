@@ -1,0 +1,149 @@
+import { describe, expect, it } from "vitest";
+
+import { ChatGPTAdapter } from "@/src/features/chat/chatgpt-adapter";
+
+function createTestDocument(
+  body: string,
+  title = "Test conversation - ChatGPT",
+): Document {
+  const testDocument = document.implementation.createHTMLDocument(title);
+
+  testDocument.body.innerHTML = body;
+
+  return testDocument;
+}
+
+describe("ChatGPTAdapter", () => {
+  it("extracts user and assistant messages in conversation order", () => {
+    const testDocument = createTestDocument(`
+      <article data-testid="conversation-turn-0">
+        <div
+          data-message-author-role="user"
+          data-message-id="user-1"
+        >
+          How does binary search work?
+        </div>
+      </article>
+
+      <article data-testid="conversation-turn-1">
+        <div
+          data-message-author-role="assistant"
+          data-message-id="assistant-1"
+        >
+          <div class="markdown">
+            <p>Binary search repeatedly divides the search range.</p>
+
+            <pre>
+              <code>const middle = Math.floor((left + right) / 2);</code>
+            </pre>
+
+            <button>Copy code</button>
+          </div>
+        </div>
+      </article>
+    `);
+
+    const adapter = new ChatGPTAdapter(
+      testDocument,
+      "https://chatgpt.com/c/example",
+    );
+
+    const conversation = adapter.extractConversation();
+
+    expect(conversation.title).toBe("Test conversation");
+    expect(conversation.url).toBe("https://chatgpt.com/c/example");
+
+    expect(conversation.messages).toHaveLength(2);
+
+    expect(conversation.messages[0]).toMatchObject({
+      id: "user-1",
+      role: "user",
+      order: 0,
+      text: "How does binary search work?",
+    });
+
+    expect(conversation.messages[1]).toMatchObject({
+      id: "assistant-1",
+      role: "assistant",
+      order: 1,
+    });
+
+    expect(conversation.messages[1].text).toContain(
+      "Binary search repeatedly divides the search range.",
+    );
+
+    expect(conversation.messages[1].html).toContain("<code>");
+
+    expect(conversation.messages[1].html).not.toContain("<button");
+  });
+
+  it("ignores unsupported roles and empty messages", () => {
+    const testDocument = createTestDocument(`
+      <div data-message-author-role="system">
+        Internal system message
+      </div>
+
+      <div data-message-author-role="tool">
+        Tool result
+      </div>
+
+      <div data-message-author-role="user">
+      </div>
+
+      <div
+        data-message-author-role="assistant"
+        data-message-id="assistant-valid"
+      >
+        <div class="markdown">
+          <p>Valid response</p>
+        </div>
+      </div>
+    `);
+
+    const adapter = new ChatGPTAdapter(testDocument);
+
+    const messages = adapter.extractMountedMessages();
+
+    expect(messages).toHaveLength(1);
+
+    expect(messages[0]).toMatchObject({
+      id: "assistant-valid",
+      role: "assistant",
+      text: "Valid response",
+    });
+  });
+
+  it("falls back to role elements when turn wrappers are missing", () => {
+    const testDocument = createTestDocument(`
+      <main>
+        <div
+          data-message-author-role="user"
+          data-message-id="message-a"
+        >
+          First message
+        </div>
+
+        <div
+          data-message-author-role="assistant"
+          data-message-id="message-b"
+        >
+          <div class="markdown">
+            <p>Second message</p>
+          </div>
+        </div>
+      </main>
+    `);
+
+    const adapter = new ChatGPTAdapter(testDocument);
+
+    const messages = adapter.extractMountedMessages();
+
+    expect(
+      messages.map((message: { role: string; order: number }) => message.role),
+    ).toEqual(["user", "assistant"]);
+
+    expect(
+      messages.map((message: { role: string; order: number }) => message.order),
+    ).toEqual([0, 1]);
+  });
+});

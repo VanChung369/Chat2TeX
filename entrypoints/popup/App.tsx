@@ -1,7 +1,7 @@
 import {
-  CHAT2TEX_PING,
-  PingMessage,
-  PingResponse,
+  CHATTEX_EXTRACT_CONVERSATION,
+  type ChatTexExtractConversationRequest,
+  type ChatTexExtractConversationResponse,
 } from "@/src/shared/messages";
 import { useEffect, useState } from "react";
 import { browser } from "wxt/browser";
@@ -11,6 +11,7 @@ type DetectionStatus = "loading" | "ready" | "unsupported" | "error";
 interface ConversationInfo {
   title: string;
   url: string;
+  messageCount: number;
 }
 
 export default function App() {
@@ -38,23 +39,19 @@ export default function App() {
         return;
       }
 
-      const request: PingMessage = {
-        type: CHAT2TEX_PING,
+      const request: ChatTexExtractConversationRequest = {
+        type: CHATTEX_EXTRACT_CONVERSATION,
       };
 
       const response = (await browser.tabs.sendMessage(
         activeTab.id,
         request,
-      )) as PingResponse;
-
-      if (!response.ok) {
-        setStatus("error");
-        return;
-      }
+      )) as ChatTexExtractConversationResponse;
 
       setConversation({
         title: response.title,
         url: response.url,
+        messageCount: response.messages.length,
       });
 
       setStatus("ready");
@@ -104,6 +101,10 @@ export default function App() {
               <strong className="conversation__title">
                 {conversation.title}
               </strong>
+
+              <span className="conversation__meta">
+                {conversation.messageCount} messages detected
+              </span>
             </div>
 
             <button

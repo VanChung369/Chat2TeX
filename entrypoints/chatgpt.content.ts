@@ -1,6 +1,7 @@
+import { ChatGPTAdapter } from "@/src/features/chat/chatgpt-adapter";
 import {
-  isPingMessage,
-  PingMessage,
+  isChatTexPingRequest,
+  isExtractConversationRequest,
   PingResponse,
 } from "@/src/shared/messages";
 import { browser } from "wxt/browser";
@@ -10,28 +11,26 @@ export default defineContentScript({
   runAt: "document_idle",
 
   main() {
-    console.info("[Chat2TeX] Content script loaded");
+    console.info("[ChatTeX] Content script loaded");
 
-    browser.runtime.onMessage.addListener(
-      (message: PingMessage): Promise<PingResponse> | undefined => {
-        if (!isPingMessage(message)) {
-          return undefined;
-        }
+    const adapter = new ChatGPTAdapter();
 
+    browser.runtime.onMessage.addListener((message: unknown) => {
+      if (isChatTexPingRequest(message)) {
         const response: PingResponse = {
           ok: true,
-          title: getConversationTitle(),
+          title: adapter.getConversationTitle(),
           url: window.location.href,
         };
 
         return Promise.resolve(response);
-      },
-    );
+      }
+
+      if (isExtractConversationRequest(message)) {
+        return Promise.resolve(adapter.extractConversation());
+      }
+
+      return undefined;
+    });
   },
 });
-
-function getConversationTitle(): string {
-  const title = document.title.replace(/\s*[-–—]\s*ChatGPT\s*$/i, "").trim();
-
-  return title || "Untitled conversation";
-}

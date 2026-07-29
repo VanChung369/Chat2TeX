@@ -202,3 +202,9 @@ button {
     opacity: 1;
   }
 }
+.conversation__meta {
+  display: block;
+  margin-top: 6px;
+  color: #657086;
+  font-size: 12px;
+}
