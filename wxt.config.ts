@@ -1,6 +1,27 @@
-import { defineConfig } from 'wxt';
+import { defineConfig } from "wxt";
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
-  modules: ['@wxt-dev/module-react'],
+  modules: ["@wxt-dev/module-react"],
+
+  manifest: {
+    name: "Chat2TeX Exporter",
+    short_name: "Chat2TeX",
+
+    description:
+      "Export ChatGPT conversations to beautifully formatted PDF and LaTeX files.",
+
+    permissions: ["storage", "downloads", "offscreen"],
+
+    host_permissions: ["https://chatgpt.com/*"],
+
+    action: {
+      default_title: "Chat2TeX Exporter",
+    },
+
+    content_security_policy: {
+      extension_pages:
+        "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+    },
+  },
 });

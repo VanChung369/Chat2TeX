@@ -1,9 +1,9 @@
 {
-  "name": "wxt-react-starter",
-  "description": "manifest.json description",
-  "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "name": "chat2tex",
+  "description": "Export ChatGPT conversations to PDF and LaTeX.",
+  "private": true,
+  "version": "0.1.0",
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
