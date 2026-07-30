@@ -1,10 +1,5 @@
 import type { ChatConversation, ChatMessage, ChatRole } from "./types";
-
-const MESSAGE_SELECTOR =
-  '[data-message-author-role="user"],' +
-  '[data-message-author-role="assistant"]';
-
-const TURN_SELECTOR = '[data-testid^="conversation-turn-"]';
+import { CHATGPT_MESSAGE_SELECTOR, CHATGPT_TURN_SELECTOR } from "./selectors";
 
 const CONTENT_SELECTOR = [
   ".markdown",
@@ -26,14 +21,20 @@ const NOISY_ELEMENT_SELECTOR = [
 export class ChatGPTAdapter {
   constructor(
     private readonly documentRef: Document = document,
-    private readonly currentUrl: string = typeof window !== "undefined"
-      ? window.location.href
-      : "",
+    private readonly fixedCurrentUrl?: string,
   ) {}
+
+  private getCurrentUrl(): string {
+    if (this.fixedCurrentUrl) {
+      return this.fixedCurrentUrl;
+    }
+
+    return this.documentRef.location?.href ?? window.location.href;
+  }
 
   isSupportedPage(): boolean {
     try {
-      const url = new URL(this.currentUrl);
+      const url = new URL(this.getCurrentUrl());
 
       return url.hostname === "chatgpt.com";
     } catch {
@@ -44,7 +45,7 @@ export class ChatGPTAdapter {
   extractConversation(): ChatConversation {
     return {
       title: this.getConversationTitle(),
-      url: this.currentUrl,
+      url: this.getCurrentUrl(),
       messages: this.extractMountedMessages(),
     };
   }
@@ -69,13 +70,14 @@ export class ChatGPTAdapter {
 
   private extractFromTurnElements(): ChatMessage[] {
     const turnElements = Array.from(
-      this.documentRef.querySelectorAll<HTMLElement>(TURN_SELECTOR),
+      this.documentRef.querySelectorAll<HTMLElement>(CHATGPT_TURN_SELECTOR),
     );
 
     const messages = turnElements
       .map((turnElement, index) => {
-        const messageElement =
-          turnElement.querySelector<HTMLElement>(MESSAGE_SELECTOR);
+        const messageElement = turnElement.querySelector<HTMLElement>(
+          CHATGPT_MESSAGE_SELECTOR,
+        );
 
         if (!messageElement) {
           return null;
@@ -90,11 +92,17 @@ export class ChatGPTAdapter {
 
   private extractFromRoleElements(): ChatMessage[] {
     const messageElements = Array.from(
-      this.documentRef.querySelectorAll<HTMLElement>(MESSAGE_SELECTOR),
+      this.documentRef.querySelectorAll<HTMLElement>(CHATGPT_MESSAGE_SELECTOR),
     );
 
     const messages = messageElements
-      .map((messageElement, index) => this.createMessage(messageElement, index))
+      .map((messageElement, index) => {
+        const turnElement =
+          messageElement.closest<HTMLElement>(CHATGPT_TURN_SELECTOR) ??
+          undefined;
+
+        return this.createMessage(messageElement, index, turnElement);
+      })
       .filter((message): message is ChatMessage => message !== null);
 
     return this.removeDuplicates(messages);

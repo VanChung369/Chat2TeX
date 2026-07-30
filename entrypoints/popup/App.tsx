@@ -3,6 +3,13 @@ import {
   type ChatTexExtractConversationRequest,
   type ChatTexExtractConversationResponse,
 } from "@/src/shared/messages";
+
+import {
+  CHATTEX_COLLECT_CONVERSATION,
+  type ChatTexCollectConversationRequest,
+  type ChatTexCollectConversationResponse,
+} from "@/src/shared/messages";
+
 import { useEffect, useState } from "react";
 import { browser } from "wxt/browser";
 
@@ -20,6 +27,10 @@ export default function App() {
   const [conversation, setConversation] = useState<ConversationInfo | null>(
     null,
   );
+
+  const [isCollecting, setIsCollecting] = useState(false);
+
+  const [collectionError, setCollectionError] = useState<string | null>(null);
 
   useEffect(() => {
     void detectConversation();
@@ -60,6 +71,54 @@ export default function App() {
 
       setConversation(null);
       setStatus("unsupported");
+    }
+  }
+
+  async function collectFullConversation(): Promise<void> {
+    setIsCollecting(true);
+    setCollectionError(null);
+
+    try {
+      const [activeTab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (activeTab?.id === undefined) {
+        throw new Error("Active tab was not found.");
+      }
+
+      const request: ChatTexCollectConversationRequest = {
+        type: CHATTEX_COLLECT_CONVERSATION,
+      };
+
+      const response = (await browser.tabs.sendMessage(
+        activeTab.id,
+        request,
+      )) as ChatTexCollectConversationResponse;
+
+      if (!response.ok) {
+        throw new Error(response.error);
+      }
+
+      setConversation({
+        title: response.conversation.title,
+        url: response.conversation.url,
+        messageCount: response.conversation.messages.length,
+      });
+
+      console.info(
+        "[ChatTeX] Full conversation collected",
+        response.conversation,
+      );
+    } catch (error) {
+      setCollectionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to collect conversation.",
+      );
+    } finally {
+      setIsCollecting(false);
     }
   }
 
@@ -110,12 +169,17 @@ export default function App() {
             <button
               className="button button--primary"
               type="button"
+              disabled={isCollecting}
               onClick={() => {
-                console.info("[ChatTeX] Export requested", conversation.url);
+                void collectFullConversation();
               }}
             >
-              Export PDF + TEX
+              {isCollecting ? "Scanning conversation..." : "Prepare PDF + TEX"}
             </button>
+
+            {collectionError && (
+              <p className="collection-error">{collectionError}</p>
+            )}
           </>
         )}
 

@@ -9,6 +9,9 @@ export interface PingMessage {
 export const CHATTEX_EXTRACT_CONVERSATION =
   "CHATTEX_EXTRACT_CONVERSATION" as const;
 
+export const CHATTEX_COLLECT_CONVERSATION =
+  "CHATTEX_COLLECT_CONVERSATION" as const;
+
 export interface ChatTexPingRequest {
   type: typeof CHAT2TEX_PING;
 }
@@ -50,4 +53,24 @@ function hasMessageType(value: unknown, expectedType: string): boolean {
   }
 
   return "type" in value && value.type === expectedType;
+}
+
+export interface ChatTexCollectConversationRequest {
+  type: typeof CHATTEX_COLLECT_CONVERSATION;
+}
+
+export type ChatTexCollectConversationResponse =
+  | {
+      ok: true;
+      conversation: ChatConversation;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export function isCollectConversationRequest(
+  value: unknown,
+): value is ChatTexCollectConversationRequest {
+  return hasMessageType(value, CHATTEX_COLLECT_CONVERSATION);
 }
