@@ -9,6 +9,8 @@ import { ConversationCollector } from "@/src/features/chat/conversation-collecto
 
 import { DomConversationViewport } from "@/src/features/chat/dom-conversation-viewport";
 
+import { LatexGenerator } from "@/src/features/latex/latex-generator";
+
 import {
   isCollectConversationRequest,
   type ChatTexCollectConversationResponse,
@@ -66,6 +68,8 @@ async function collectConversation(
   adapter: ChatGPTAdapter,
 ): Promise<ChatTexCollectConversationResponse> {
   try {
+    const latexGenerator = new LatexGenerator();
+
     const viewport = DomConversationViewport.fromDocument();
 
     const collector = new ConversationCollector(adapter, viewport);
@@ -78,6 +82,12 @@ async function collectConversation(
     const documentAst = parser.parseConversation(conversation);
 
     console.info("[ChatTeX] Document AST", documentAst);
+
+    const latexResult = latexGenerator.generate(documentAst);
+
+    console.info("[ChatTeX] Generated LaTeX", latexResult.source);
+
+    console.info("[ChatTeX] Required assets", latexResult.assets);
     return {
       ok: true,
       conversation,
