@@ -15,6 +15,8 @@ export default defineConfig({
 
     host_permissions: ["https://chatgpt.com/*"],
 
+    optional_host_permissions: ["https://*/*"],
+
     action: {
       default_title: "Chat2TeX Exporter",
     },
