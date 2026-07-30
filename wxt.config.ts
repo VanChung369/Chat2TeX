@@ -13,7 +13,10 @@ export default defineConfig({
 
     permissions: ["storage", "downloads", "offscreen"],
 
-    host_permissions: ["https://chatgpt.com/*"],
+    host_permissions: [
+      "https://chatgpt.com/*",
+      "https://*.gstatic.com/*",
+    ],
 
     optional_host_permissions: ["https://*/*"],
 
