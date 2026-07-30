@@ -5,6 +5,15 @@ import type {
   ResolveAssetResult,
 } from "@/src/features/assets/types";
 
+import type {
+  PageImageData,
+  PageImageReadResult,
+} from "@/src/features/assets/page-image-reader";
+
+import type { PreparedExport } from "@/src/features/export/types";
+
+import type { LatexAssetRequest } from "@/src/features/latex/types";
+
 export const CHAT2TEX_PING = "CHAT2TEX_PING";
 
 export interface PingMessage {
@@ -19,6 +28,12 @@ export const CHATTEX_COLLECT_CONVERSATION =
 
 export const CHATTEX_PROCESS_IMAGE_ASSET =
   "CHATTEX_PROCESS_IMAGE_ASSET" as const;
+
+export const CHATTEX_PREPARE_EXPORT = "CHATTEX_PREPARE_EXPORT" as const;
+
+export const CHATTEX_READ_PAGE_IMAGE = "CHATTEX_READ_PAGE_IMAGE" as const;
+
+export const CHATTEX_CONVERT_IMAGE_DATA = "CHATTEX_CONVERT_IMAGE_DATA" as const;
 
 export interface ChatTexPingRequest {
   type: typeof CHAT2TEX_PING;
@@ -119,5 +134,78 @@ export function isProcessImageAssetRequest(
     typeof asset.outputPath === "string" &&
     "alt" in asset &&
     typeof asset.alt === "string"
+  );
+}
+
+export interface ChatTexPrepareExportRequest {
+  type: typeof CHATTEX_PREPARE_EXPORT;
+}
+
+export type ChatTexPrepareExportResponse =
+  | {
+      ok: true;
+      prepared: PreparedExport;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export interface ChatTexReadPageImageRequest {
+  type: typeof CHATTEX_READ_PAGE_IMAGE;
+  asset: LatexAssetRequest;
+}
+
+export type ChatTexReadPageImageResponse = PageImageReadResult;
+
+export interface ChatTexConvertImageDataRequest {
+  type: typeof CHATTEX_CONVERT_IMAGE_DATA;
+
+  asset: LatexAssetRequest;
+  data: PageImageData;
+}
+
+export function isPrepareExportRequest(
+  value: unknown,
+): value is ChatTexPrepareExportRequest {
+  return hasMessageType(value, CHATTEX_PREPARE_EXPORT);
+}
+
+export function isReadPageImageRequest(
+  value: unknown,
+): value is ChatTexReadPageImageRequest {
+  return hasMessageType(value, CHATTEX_READ_PAGE_IMAGE) && hasAsset(value);
+}
+
+export function isConvertImageDataRequest(
+  value: unknown,
+): value is ChatTexConvertImageDataRequest {
+  return (
+    hasMessageType(value, CHATTEX_CONVERT_IMAGE_DATA) &&
+    hasAsset(value) &&
+    typeof value === "object" &&
+    value !== null &&
+    "data" in value
+  );
+}
+
+function hasAsset(value: unknown): value is {
+  asset: LatexAssetRequest;
+} {
+  if (typeof value !== "object" || value === null || !("asset" in value)) {
+    return false;
+  }
+
+  const asset = value.asset;
+
+  return (
+    typeof asset === "object" &&
+    asset !== null &&
+    "id" in asset &&
+    typeof asset.id === "string" &&
+    "sourceUrl" in asset &&
+    typeof asset.sourceUrl === "string" &&
+    "outputPath" in asset &&
+    typeof asset.outputPath === "string"
   );
 }

@@ -6,71 +6,83 @@ import { BrowserHostPermissionChecker } from "@/src/features/assets/browser-host
 
 import { BrowserImageConverter } from "@/src/features/assets/browser-image-converter";
 
+import { ImageDataProcessor } from "@/src/features/assets/image-data-processor";
+
 import {
+  isConvertImageDataRequest,
   isProcessImageAssetRequest,
-  type ChatTexProcessImageAssetResponse,
 } from "@/src/shared/messages";
 
 export default defineBackground(() => {
-  console.info("[ChatTeX] Background service worker started");
+  const imageConverter = new BrowserImageConverter();
 
   const assetManager = new AssetManager(
     new BrowserHostPermissionChecker(),
     fetch,
-    new BrowserImageConverter(),
+    imageConverter,
   );
 
-  browser.runtime.onInstalled.addListener(({ reason }) => {
-    if (reason === "install") {
-      console.info("[ChatTeX] Extension installed");
-    }
-
-    if (reason === "update") {
-      console.info("[ChatTeX] Extension updated");
-    }
-  });
+  const imageDataProcessor = new ImageDataProcessor(imageConverter);
 
   browser.runtime.onMessage.addListener(
-    (
-      message: unknown,
-      sender,
-    ): Promise<ChatTexProcessImageAssetResponse> | undefined => {
-      if (!isProcessImageAssetRequest(message)) {
-        return undefined;
-      }
-
+    (message: unknown, sender, sendResponse) => {
       if (!isTrustedSender(sender)) {
-        return Promise.resolve({
-          ok: false,
-          code: "download-failed",
-          message: "The asset request sender is not trusted.",
-        });
+        return;
       }
 
-      return assetManager.resolve(message.asset);
+      if (isProcessImageAssetRequest(message)) {
+        void assetManager
+          .resolve(message.asset)
+          .then(sendResponse)
+          .catch((error) => {
+            sendResponse({
+              ok: false,
+              code: "download-failed",
+
+              message: readErrorMessage(error),
+            });
+          });
+
+        return true;
+      }
+
+      if (isConvertImageDataRequest(message)) {
+        void imageDataProcessor
+          .process(message.asset, message.data)
+          .then(sendResponse)
+          .catch((error) => {
+            sendResponse({
+              ok: false,
+              code: "decode-failed",
+
+              message: readErrorMessage(error),
+            });
+          });
+
+        return true;
+      }
+
+      return;
     },
   );
 });
 
-function isTrustedSender(sender: {
-  id?: string;
-  tab?: {
-    url?: string;
-  };
-}): boolean {
+function isTrustedSender(sender: Browser.runtime.MessageSender): boolean {
   if (sender.id !== browser.runtime.id) {
     return false;
   }
 
-  const senderUrl = sender.tab?.url;
-
-  if (!senderUrl) {
+  if (!sender.tab?.url) {
     return true;
   }
 
   try {
-    return new URL(senderUrl).hostname === "chatgpt.com";
+    return new URL(sender.tab.url).hostname === "chatgpt.com";
   } catch {
     return false;
   }
+}
+
+function readErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown background error.";
 }

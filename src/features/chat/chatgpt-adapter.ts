@@ -123,7 +123,10 @@ export class ChatGPTAdapter {
       messageElement.querySelector<HTMLElement>(CONTENT_SELECTOR) ??
       messageElement;
 
-    const cleanedContent = this.cloneAndCleanContent(contentElement);
+    const cleanedContent = this.cloneAndCleanContent(
+      contentElement,
+      messageElement,
+    );
 
     const text = normalizeText(cleanedContent.textContent ?? "");
 
@@ -177,12 +180,35 @@ export class ChatGPTAdapter {
     return Number.isNaN(parsedOrder) ? fallbackOrder : parsedOrder;
   }
 
-  private cloneAndCleanContent(contentElement: HTMLElement): HTMLElement {
+  private cloneAndCleanContent(
+    contentElement: HTMLElement,
+    messageElement: HTMLElement,
+  ): HTMLElement {
     const clone = contentElement.cloneNode(true) as HTMLElement;
 
     clone
       .querySelectorAll(NOISY_ELEMENT_SELECTOR)
       .forEach((element) => element.remove());
+
+    const retainedImageSources = new Set(
+      Array.from(clone.querySelectorAll<HTMLImageElement>("img"))
+        .map(readImageSource)
+        .filter(Boolean),
+    );
+
+    for (const imageElement of messageElement.querySelectorAll("img")) {
+      const sourceUrl = readImageSource(imageElement);
+
+      if (!sourceUrl || retainedImageSources.has(sourceUrl)) {
+        continue;
+      }
+
+      const imageClone = imageElement.cloneNode(false) as HTMLImageElement;
+
+      imageClone.setAttribute("src", sourceUrl);
+      clone.append(imageClone);
+      retainedImageSources.add(sourceUrl);
+    }
 
     return clone;
   }
@@ -208,4 +234,13 @@ function normalizeText(value: string): string {
     .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function readImageSource(imageElement: HTMLImageElement): string {
+  return (
+    imageElement.currentSrc ||
+    imageElement.src ||
+    imageElement.getAttribute("src") ||
+    ""
+  ).trim();
 }

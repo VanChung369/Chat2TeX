@@ -330,35 +330,42 @@ export class LatexGenerator {
   private renderBlockImage(sourceUrl: string, alt: string): string {
     const asset = this.registerImage(sourceUrl, alt);
 
-    const caption = alt.trim()
-      ? ["\\par", "\\small\\emph{", escapeLatexText(alt.trim()), "}"].join("")
-      : "";
+    const safeAlt = escapeLatexText(alt.trim() || "Image unavailable");
 
     return [
       "\\begin{center}",
-      "\\includegraphics[",
-      "  width=\\linewidth,",
-      "  height=0.75\\textheight,",
-      "  keepaspectratio",
-      `]{${asset.outputPath}}`,
-      caption,
+      `\\IfFileExists{${asset.outputPath}}{`,
+      "  \\includegraphics[",
+      "    width=\\linewidth,",
+      "    height=0.75\\textheight,",
+      "    keepaspectratio",
+      `  ]{${asset.outputPath}}`,
+      "}{",
+      "  \\fbox{",
+      "    \\parbox{0.85\\linewidth}{",
+      `      ${safeAlt}`,
+      "    }",
+      "  }",
+      "}",
       "\\end{center}",
-    ]
-      .filter(Boolean)
-      .join("\n");
+    ].join("\n");
   }
 
   private renderInlineImage(sourceUrl: string, alt: string): string {
     const asset = this.registerImage(sourceUrl, alt);
 
     return [
-      "\\raisebox{-0.2em}{",
-      "\\includegraphics[",
-      "  height=1.2em,",
-      "  keepaspectratio",
-      `]{${asset.outputPath}}`,
+      `\\IfFileExists{${asset.outputPath}}{`,
+      "  \\raisebox{-0.2em}{",
+      "    \\includegraphics[",
+      "      height=1.2em,",
+      "      keepaspectratio",
+      `    ]{${asset.outputPath}}`,
+      "  }",
+      "}{",
+      `  \\texttt{[${escapeLatexText(alt || "image")}]}`,
       "}",
-    ].join("");
+    ].join("\n");
   }
 
   private registerImage(sourceUrl: string, alt: string): LatexAssetRequest {

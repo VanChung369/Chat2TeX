@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { ChatGPTAdapter } from "@/src/features/chat/chatgpt-adapter";
+import { HtmlToAstParser } from "@/src/features/document/html-to-ast";
+import { LatexGenerator } from "@/src/features/latex/latex-generator";
 
 function createTestDocument(
   body: string,
@@ -75,6 +77,49 @@ describe("ChatGPTAdapter", () => {
     expect(conversation.messages[1].html).toContain("<code>");
 
     expect(conversation.messages[1].html).not.toContain("<button");
+  });
+
+  it("preserves generated images for LaTeX asset collection", () => {
+    const testDocument = createTestDocument(`
+      <article data-testid="conversation-turn-0">
+        <div
+          data-message-author-role="assistant"
+          data-message-id="assistant-image"
+        >
+          <div class="markdown">
+            <p>Here is the generated image.</p>
+          </div>
+
+          <button aria-label="Open image">
+            <img
+              src="https://cdn.example.com/generated-image.webp"
+              alt="Generated landscape"
+            />
+          </button>
+        </div>
+      </article>
+    `);
+
+    const adapter = new ChatGPTAdapter(
+      testDocument,
+      "https://chatgpt.com/c/example",
+    );
+
+    const conversation = adapter.extractConversation();
+    const documentAst = new HtmlToAstParser(testDocument).parseConversation(
+      conversation,
+    );
+    const result = new LatexGenerator().generate(documentAst);
+
+    expect(result.assets).toEqual([
+      {
+        id: "image-001",
+        kind: "image",
+        sourceUrl: "https://cdn.example.com/generated-image.webp",
+        outputPath: "assets/image-001.png",
+        alt: "Generated landscape",
+      },
+    ]);
   });
 
   it("ignores unsupported roles and empty messages", () => {

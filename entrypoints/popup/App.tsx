@@ -1,3 +1,9 @@
+import { browser } from "wxt/browser";
+
+import { useEffect, useState } from "react";
+
+import { useExportFlow } from "./use-export-flow";
+
 import {
   CHATTEX_EXTRACT_CONVERSATION,
   type ChatTexExtractConversationRequest,
@@ -9,9 +15,6 @@ import {
   type ChatTexCollectConversationRequest,
   type ChatTexCollectConversationResponse,
 } from "@/src/shared/messages";
-
-import { useEffect, useState } from "react";
-import { browser } from "wxt/browser";
 
 type DetectionStatus = "loading" | "ready" | "unsupported" | "error";
 
@@ -28,9 +31,7 @@ export default function App() {
     null,
   );
 
-  const [isCollecting, setIsCollecting] = useState(false);
-
-  const [collectionError, setCollectionError] = useState<string | null>(null);
+  const exportFlow = useExportFlow();
 
   useEffect(() => {
     void detectConversation();
@@ -71,54 +72,6 @@ export default function App() {
 
       setConversation(null);
       setStatus("unsupported");
-    }
-  }
-
-  async function collectFullConversation(): Promise<void> {
-    setIsCollecting(true);
-    setCollectionError(null);
-
-    try {
-      const [activeTab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (activeTab?.id === undefined) {
-        throw new Error("Active tab was not found.");
-      }
-
-      const request: ChatTexCollectConversationRequest = {
-        type: CHATTEX_COLLECT_CONVERSATION,
-      };
-
-      const response = (await browser.tabs.sendMessage(
-        activeTab.id,
-        request,
-      )) as ChatTexCollectConversationResponse;
-
-      if (!response.ok) {
-        throw new Error(response.error);
-      }
-
-      setConversation({
-        title: response.conversation.title,
-        url: response.conversation.url,
-        messageCount: response.conversation.messages.length,
-      });
-
-      console.info(
-        "[ChatTeX] Full conversation collected",
-        response.conversation,
-      );
-    } catch (error) {
-      setCollectionError(
-        error instanceof Error
-          ? error.message
-          : "Unable to collect conversation.",
-      );
-    } finally {
-      setIsCollecting(false);
     }
   }
 
@@ -169,16 +122,86 @@ export default function App() {
             <button
               className="button button--primary"
               type="button"
-              disabled={isCollecting}
+              disabled={
+                exportFlow.phase === "preparing" ||
+                exportFlow.phase === "processing-assets"
+              }
               onClick={() => {
-                void collectFullConversation();
+                void exportFlow.prepare();
               }}
             >
-              {isCollecting ? "Scanning conversation..." : "Prepare PDF + TEX"}
+              {exportFlow.phase === "preparing"
+                ? "Scanning conversation..."
+                : "Prepare PDF + TEX"}
             </button>
 
-            {collectionError && (
-              <p className="collection-error">{collectionError}</p>
+            {exportFlow.phase === "permission-required" && (
+              <section className="permission-card">
+                <strong>Image access required</strong>
+
+                <p>ChatTeX needs permission to download images from:</p>
+
+                <ul>
+                  {exportFlow.missingOrigins.map((origin) => (
+                    <li key={origin}>{origin}</li>
+                  ))}
+                </ul>
+
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={() => {
+                    void exportFlow.grantPermissions();
+                  }}
+                >
+                  Allow image access
+                </button>
+              </section>
+            )}
+
+            {exportFlow.phase === "processing-assets" &&
+              exportFlow.progress && (
+                <section className="progress-card">
+                  <strong>Processing images</strong>
+
+                  <p>
+                    {exportFlow.progress.current}
+                    {" / "}
+                    {exportFlow.progress.total}
+                  </p>
+
+                  <progress
+                    max={exportFlow.progress.total}
+                    value={exportFlow.progress.current}
+                  />
+
+                  <span>{exportFlow.progress.label}</span>
+                </section>
+              )}
+
+            {exportFlow.phase === "ready" &&
+              exportFlow.prepared &&
+              exportFlow.processedAssets && (
+                <section className="export-ready">
+                  <strong>Export is ready to compile</strong>
+
+                  <p>{exportFlow.prepared.assets.length} images detected</p>
+
+                  <p>
+                    {exportFlow.processedAssets.files.length} images processed
+                  </p>
+
+                  {exportFlow.processedAssets.failures.length > 0 && (
+                    <p className="warning-text">
+                      {exportFlow.processedAssets.failures.length} images could
+                      not be loaded.
+                    </p>
+                  )}
+                </section>
+              )}
+
+            {exportFlow.phase === "error" && exportFlow.error && (
+              <p className="collection-error">{exportFlow.error}</p>
             )}
           </>
         )}

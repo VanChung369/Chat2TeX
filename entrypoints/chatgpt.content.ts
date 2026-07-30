@@ -1,24 +1,29 @@
+import { browser } from "wxt/browser";
+
 import { ChatGPTAdapter } from "@/src/features/chat/chatgpt-adapter";
-import {
-  isChatTexPingRequest,
-  isExtractConversationRequest,
-  PingResponse,
-} from "@/src/shared/messages";
 
 import { ConversationCollector } from "@/src/features/chat/conversation-collector";
 
 import { DomConversationViewport } from "@/src/features/chat/dom-conversation-viewport";
 
-import { LatexGenerator } from "@/src/features/latex/latex-generator";
-
-import {
-  isCollectConversationRequest,
-  type ChatTexCollectConversationResponse,
-} from "@/src/shared/messages";
+import type { ChatConversation } from "@/src/features/chat/types";
 
 import { HtmlToAstParser } from "@/src/features/document/html-to-ast";
 
-import { browser } from "wxt/browser";
+import { LatexGenerator } from "@/src/features/latex/latex-generator";
+
+import { PageImageReader } from "@/src/features/assets/page-image-reader";
+
+import {
+  isChatTexPingRequest,
+  isCollectConversationRequest,
+  isExtractConversationRequest,
+  isPrepareExportRequest,
+  isReadPageImageRequest,
+  type ChatTexCollectConversationResponse,
+  type ChatTexPrepareExportResponse,
+  type PingResponse,
+} from "@/src/shared/messages";
 
 export default defineContentScript({
   matches: ["https://chatgpt.com/*"],
@@ -29,76 +34,129 @@ export default defineContentScript({
 
     const adapter = new ChatGPTAdapter();
 
-    let collectionPromise: Promise<ChatTexCollectConversationResponse> | null =
-      null;
+    const pageImageReader = new PageImageReader();
 
-    browser.runtime.onMessage.addListener((message: unknown) => {
-      if (isChatTexPingRequest(message)) {
-        const response: PingResponse = {
-          ok: true,
-          title: adapter.getConversationTitle(),
-          url: window.location.href,
-        };
+    let collectionPromise: Promise<ChatConversation> | null = null;
 
-        return Promise.resolve(response);
-      }
-
-      if (isExtractConversationRequest(message)) {
-        return Promise.resolve(adapter.extractConversation());
-      }
-
-      if (isCollectConversationRequest(message)) {
-        if (collectionPromise) {
-          return collectionPromise;
-        }
-
-        collectionPromise = collectConversation(adapter).finally(() => {
-          collectionPromise = null;
-        });
-
+    const collectConversation = (): Promise<ChatConversation> => {
+      if (collectionPromise) {
         return collectionPromise;
       }
 
-      return undefined;
-    });
+      collectionPromise = runConversationCollection(adapter).finally(() => {
+        collectionPromise = null;
+      });
+
+      return collectionPromise;
+    };
+
+    browser.runtime.onMessage.addListener(
+      (message: unknown, _sender, sendResponse) => {
+        if (isChatTexPingRequest(message)) {
+          const response: PingResponse = {
+            ok: true,
+            title: adapter.getConversationTitle(),
+            url: window.location.href,
+          };
+
+          sendResponse(response);
+          return;
+        }
+
+        if (isExtractConversationRequest(message)) {
+          sendResponse(adapter.extractConversation());
+
+          return;
+        }
+
+        if (isCollectConversationRequest(message)) {
+          void collectConversation()
+            .then((conversation) => {
+              const response: ChatTexCollectConversationResponse = {
+                ok: true,
+                conversation,
+              };
+
+              sendResponse(response);
+            })
+            .catch((error) => {
+              sendResponse({
+                ok: false,
+
+                error: readErrorMessage(error),
+              });
+            });
+
+          return true;
+        }
+
+        if (isPrepareExportRequest(message)) {
+          void collectConversation()
+            .then((conversation) => {
+              const parser = new HtmlToAstParser();
+
+              const generator = new LatexGenerator();
+
+              const ast = parser.parseConversation(conversation);
+
+              const latex = generator.generate(ast);
+
+              const response: ChatTexPrepareExportResponse = {
+                ok: true,
+
+                prepared: {
+                  title: conversation.title,
+                  url: conversation.url,
+                  latexSource: latex.source,
+                  assets: latex.assets,
+                },
+              };
+
+              sendResponse(response);
+            })
+            .catch((error) => {
+              sendResponse({
+                ok: false,
+                error: readErrorMessage(error),
+              });
+            });
+
+          return true;
+        }
+
+        if (isReadPageImageRequest(message)) {
+          void pageImageReader
+            .read(message.asset)
+            .then(sendResponse)
+            .catch((error) => {
+              sendResponse({
+                ok: false,
+                code: "download-failed",
+                message: readErrorMessage(error),
+              });
+            });
+
+          return true;
+        }
+
+        return;
+      },
+    );
   },
 });
 
-async function collectConversation(
+async function runConversationCollection(
   adapter: ChatGPTAdapter,
-): Promise<ChatTexCollectConversationResponse> {
-  try {
-    const latexGenerator = new LatexGenerator();
+): Promise<ChatConversation> {
+  const viewport = DomConversationViewport.fromDocument();
 
-    const viewport = DomConversationViewport.fromDocument();
+  const collector = new ConversationCollector(adapter, viewport);
 
-    const collector = new ConversationCollector(adapter, viewport);
+  return collector.collect((progress) => {
+    console.info("[ChatTeX] Collecting", progress);
+  });
+}
 
-    const conversation = await collector.collect((progress) => {
-      console.info("[ChatTeX] Collecting conversation", progress);
-    });
-
-    const parser = new HtmlToAstParser();
-    const documentAst = parser.parseConversation(conversation);
-
-    console.info("[ChatTeX] Document AST", documentAst);
-
-    const latexResult = latexGenerator.generate(documentAst);
-
-    console.info("[ChatTeX] Generated LaTeX", latexResult.source);
-
-    console.info("[ChatTeX] Required assets", latexResult.assets);
-    return {
-      ok: true,
-      conversation,
-    };
-  } catch (error) {
-    console.error("[ChatTeX] Collection failed", error);
-
-    return {
-      ok: false,
-      error:
-        error instanceof Error ? error.message : "Unknown collection error.",
-    };
-  }
+function readErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown export error.";
 }

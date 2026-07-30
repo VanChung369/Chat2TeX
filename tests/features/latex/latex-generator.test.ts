@@ -225,6 +225,8 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain("\\begin{chatmessage}{User}");
 
     expect(result.source).toContain("\\begin{chatmessage}{Assistant}");
+
+    expect(result.source).toContain("\\IfFileExists{assets/image-001.png}");
   });
 
   it("escapes special LaTeX characters in normal text", () => {
