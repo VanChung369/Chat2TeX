@@ -50,6 +50,23 @@ export class ChatGPTAdapter {
     };
   }
 
+  hasConversationStart(): boolean | null {
+    const numberedTurns = Array.from(
+      this.documentRef.querySelectorAll<HTMLElement>(CHATGPT_TURN_SELECTOR),
+    )
+      .map((element) => element.getAttribute("data-testid") ?? "")
+      .map((testId) => testId.match(/^conversation-turn-(\d+)$/))
+      .filter((match): match is RegExpMatchArray => match !== null);
+
+    if (numberedTurns.length === 0) {
+      return null;
+    }
+
+    return numberedTurns.some(
+      (match) => Number.parseInt(match[1], 10) === 0,
+    );
+  }
+
   getConversationTitle(): string {
     const title = this.documentRef.title
       .replace(/\s*[-–—]\s*ChatGPT\s*$/i, "")
@@ -119,14 +136,7 @@ export class ChatGPTAdapter {
       return null;
     }
 
-    const contentElement =
-      messageElement.querySelector<HTMLElement>(CONTENT_SELECTOR) ??
-      messageElement;
-
-    const cleanedContent = this.cloneAndCleanContent(
-      contentElement,
-      messageElement,
-    );
+    const cleanedContent = this.cloneAndCleanContent(messageElement);
 
     const text = normalizeText(cleanedContent.textContent ?? "");
 
@@ -181,10 +191,27 @@ export class ChatGPTAdapter {
   }
 
   private cloneAndCleanContent(
-    contentElement: HTMLElement,
     messageElement: HTMLElement,
   ): HTMLElement {
-    const clone = contentElement.cloneNode(true) as HTMLElement;
+    const candidates = Array.from(
+      messageElement.querySelectorAll<HTMLElement>(CONTENT_SELECTOR),
+    );
+
+    const topLevelCandidates = candidates.filter(
+      (candidate) =>
+        !candidates.some(
+          (other) => other !== candidate && other.contains(candidate),
+        ),
+    );
+
+    const clone =
+      topLevelCandidates.length > 0
+        ? this.documentRef.createElement("div")
+        : (messageElement.cloneNode(true) as HTMLElement);
+
+    for (const sourceElement of topLevelCandidates) {
+      clone.append(sourceElement.cloneNode(true));
+    }
 
     clone
       .querySelectorAll(NOISY_ELEMENT_SELECTOR)

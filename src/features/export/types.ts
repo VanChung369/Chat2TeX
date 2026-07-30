@@ -8,6 +8,7 @@ import type {
 export interface PreparedExport {
   title: string;
   url: string;
+  messageCount: number;
   latexSource: string;
   assets: LatexAssetRequest[];
 }

@@ -8,9 +8,7 @@ import { DomConversationViewport } from "@/src/features/chat/dom-conversation-vi
 
 import type { ChatConversation } from "@/src/features/chat/types";
 
-import { HtmlToAstParser } from "@/src/features/document/html-to-ast";
-
-import { LatexGenerator } from "@/src/features/latex/latex-generator";
+import { prepareConversationExport } from "@/src/features/export/prepare-conversation-export";
 
 import { PageImageReader } from "@/src/features/assets/page-image-reader";
 
@@ -93,23 +91,9 @@ export default defineContentScript({
         if (isPrepareExportRequest(message)) {
           void collectConversation()
             .then((conversation) => {
-              const parser = new HtmlToAstParser();
-
-              const generator = new LatexGenerator();
-
-              const ast = parser.parseConversation(conversation);
-
-              const latex = generator.generate(ast);
-
               const response: ChatTexPrepareExportResponse = {
                 ok: true,
-
-                prepared: {
-                  title: conversation.title,
-                  url: conversation.url,
-                  latexSource: latex.source,
-                  assets: latex.assets,
-                },
+                prepared: prepareConversationExport(conversation),
               };
 
               sendResponse(response);

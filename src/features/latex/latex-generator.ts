@@ -15,23 +15,85 @@ import {
 
 import type { LatexAssetRequest, LatexGenerationResult } from "./types";
 
+interface BlockRenderContext {
+  numberedHeadings: boolean;
+  headingBaseLevel: number;
+  headingLevelOffset: 0 | 1;
+}
+
+type DocumentLanguage = "en" | "vi";
+
+interface BookLabels {
+  contents: string;
+  question: string;
+  subtitle: string;
+  source: string;
+  attribution: string;
+}
+
+const VIETNAMESE_CHARACTER_PATTERN =
+  /[ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬĐÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴàáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]/u;
+
+const VIETNAMESE_LISTINGS_CHARACTERS =
+  "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬĐÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴàáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ";
+
+const BOOK_LABELS: Readonly<Record<DocumentLanguage, BookLabels>> = {
+  en: {
+    contents: "Contents",
+    question: "Reader's question",
+    subtitle: "A thoughtfully typeset ChatGPT conversation",
+    source: "Source",
+    attribution: "Exported with Chat2TeX",
+  },
+  vi: {
+    contents: "Mục lục",
+    question: "Câu hỏi",
+    subtitle: "Cuộc trò chuyện ChatGPT được trình bày như một cuốn sách",
+    source: "Nguồn",
+    attribution: "Xuất bằng Chat2TeX",
+  },
+};
+
 export class LatexGenerator {
   private assets: LatexAssetRequest[] = [];
 
   generate(document: ChatDocumentAst): LatexGenerationResult {
     this.assets = [];
 
-    const body = document.messages
+    const language = detectDocumentLanguage(document);
+
+    const labels = BOOK_LABELS[language];
+
+    let questionNumber = 0;
+    let hasQuestionSection = false;
+
+    const body = [...document.messages]
       .sort((first, second) => first.order - second.order)
-      .map((message) => this.renderMessage(message))
+      .map((message) => {
+        if (message.role === "user") {
+          questionNumber += 1;
+          hasQuestionSection = true;
+        }
+
+        return this.renderMessage(
+          message,
+          this.findMessageHeadingBaseLevel(message),
+          message.role === "assistant" && hasQuestionSection ? 1 : 0,
+          language,
+          labels,
+          questionNumber,
+        );
+      })
       .join("\n\n");
 
     const source = [
-      this.renderPreamble(),
+      this.renderPreamble(language, labels),
       "",
       "\\begin{document}",
       "",
-      this.renderDocumentHeader(document),
+      this.renderCover(document, labels),
+      "",
+      this.renderContents(document),
       "",
       body,
       "",
@@ -45,15 +107,14 @@ export class LatexGenerator {
     };
   }
 
-  private renderPreamble(): string {
+  private renderPreamble(
+    language: DocumentLanguage,
+    labels: BookLabels,
+  ): string {
     return [
       "\\documentclass[11pt,a4paper]{article}",
       "",
-      "\\IfFileExists{fontspec.sty}{",
-      "  \\usepackage{fontspec}",
-      "  \\setmainfont{Latin Modern Roman}",
-      "  \\setmonofont{Latin Modern Mono}",
-      "}{}",
+      ...this.renderFontConfiguration(language),
       "\\usepackage{amsmath}",
       "\\usepackage{amssymb}",
       "\\usepackage{graphicx}",
@@ -67,100 +128,407 @@ export class LatexGenerator {
       "\\usepackage{geometry}",
       "",
       "\\geometry{",
-      "  top=22mm,",
-      "  bottom=22mm,",
-      "  left=20mm,",
-      "  right=20mm",
+      "  top=23mm,",
+      "  bottom=23mm,",
+      "  left=24mm,",
+      "  right=24mm,",
+      "  headheight=22pt,",
+      "  headsep=6mm,",
+      "  footskip=10mm",
       "}",
+      "",
+      "\\definecolor{bookpaper}{HTML}{FFFDF8}",
+      "\\definecolor{bookink}{HTML}{332E2A}",
+      "\\definecolor{bookmuted}{HTML}{81766B}",
+      "\\definecolor{bookaccent}{HTML}{A86B3F}",
+      "\\definecolor{bookrule}{HTML}{DED5CA}",
+      "\\definecolor{questionaccent}{HTML}{6E8B75}",
+      "\\definecolor{questiontext}{HTML}{33483A}",
+      "\\definecolor{codebackground}{HTML}{F3F1ED}",
+      "\\definecolor{codeforeground}{HTML}{25282E}",
+      "\\definecolor{codecomment}{HTML}{397052}",
+      "\\definecolor{codekeyword}{HTML}{1F5FAE}",
+      "\\definecolor{codestring}{HTML}{A13D52}",
+      "\\definecolor{codelabel}{HTML}{8A5A3B}",
+      "\\definecolor{coderule}{HTML}{D8D1C7}",
       "",
       "\\hypersetup{",
       "  colorlinks=true,",
-      "  linkcolor=blue,",
-      "  urlcolor=blue",
+      "  linkcolor=bookaccent,",
+      "  urlcolor=bookaccent,",
+      "  citecolor=bookaccent",
       "}",
       "",
-      "\\definecolor{userbackground}{HTML}{EEF4FF}",
-      "\\definecolor{userborder}{HTML}{5570F1}",
-      "\\definecolor{assistantbackground}{HTML}{F5F7FA}",
-      "\\definecolor{assistantborder}{HTML}{7A8496}",
+      "\\AtBeginDocument{\\pagecolor{bookpaper}\\color{bookink}}",
+      "\\setlength{\\parindent}{0pt}",
+      "\\setlength{\\parskip}{0.62em}",
+      "\\setlength{\\abovedisplayskip}{0.9em}",
+      "\\setlength{\\belowdisplayskip}{0.9em}",
+      "\\linespread{1.08}",
+      "\\raggedbottom",
+      "\\clubpenalty=10000",
+      "\\widowpenalty=10000",
+      "\\displaywidowpenalty=10000",
+      "\\emergencystretch=2em",
+      "\\setcounter{tocdepth}{2}",
+      "\\setcounter{secnumdepth}{3}",
+      `\\renewcommand{\\contentsname}{${escapeNormalizedText(
+        labels.contents,
+      )}}`,
+      "\\setlist{itemsep=0.25em, topsep=0.45em, parsep=0pt}",
       "",
-      "\\newcommand{\\chatmessageheader}[1]{",
-      "  \\par\\medskip",
-      "  \\noindent",
-      "  \\colorbox{assistantbackground}{",
-      "    \\parbox{\\dimexpr\\linewidth-2\\fboxsep\\relax}{",
-      "      \\bfseries #1",
-      "    }",
-      "  }",
+      "\\newenvironment{readerquestion}[1]{",
+      "  \\par\\bigskip",
+      "  \\begingroup",
+      "  \\setlength{\\leftskip}{1.3em}",
+      "  \\setlength{\\rightskip}{0.6em}",
+      "  \\noindent\\textcolor{questionaccent}{\\rule{22mm}{1.2pt}}",
       "  \\par\\smallskip",
+      "  {\\sffamily\\scriptsize\\bfseries\\color{questionaccent}\\MakeUppercase{#1}}",
+      "  \\par\\smallskip",
+      "  \\sffamily\\color{questiontext}",
+      "}{",
+      "  \\par\\endgroup\\bigskip",
       "}",
+      "",
+      "\\makeatletter",
+      "\\newcommand{\\chatbooktitle}{}",
+      "\\newcommand{\\setchatbooktitle}[1]{\\renewcommand{\\chatbooktitle}{#1}}",
+      "\\newcommand{\\chatquestionsection}[1]{%",
+      "  \\refstepcounter{section}%",
+      "  \\addcontentsline{toc}{section}{\\protect\\numberline{\\thesection}#1}%",
+      "  \\markright{#1}%",
+      "}",
+      "\\renewcommand{\\sectionmark}[1]{\\markright{#1}}",
+      "\\def\\ps@chatbook{",
+      "  \\def\\@oddhead{%",
+      "    \\vbox{%",
+      "      \\hbox to\\textwidth{%",
+      "        \\parbox[b]{0.46\\textwidth}{\\raggedright\\sffamily\\scriptsize\\color{bookmuted}\\chatbooktitle}%",
+      "        \\hfill%",
+      "        \\parbox[b]{0.46\\textwidth}{\\raggedleft\\sffamily\\scriptsize\\color{bookmuted}\\rightmark}%",
+      "      }%",
+      "      \\vskip 4pt%",
+      "      \\hbox{\\textcolor{bookrule}{\\rule{\\textwidth}{0.4pt}}}%",
+      "    }%",
+      "  }",
+      "  \\def\\@evenhead{\\@oddhead}",
+      "  \\def\\@oddfoot{%",
+      "    \\sffamily\\scriptsize\\color{bookmuted}Chat2TeX%",
+      "    \\hfill\\thepage%",
+      "  }",
+      "  \\def\\@evenfoot{\\@oddfoot}",
+      "}",
+      "\\renewcommand\\section{\\@startsection{section}{1}{\\z@}%",
+      "  {-3.2ex \\@plus -1ex \\@minus -.2ex}%",
+      "  {1.4ex \\@plus .2ex}%",
+      "  {\\normalfont\\sffamily\\LARGE\\bfseries\\color{bookink}}}",
+      "\\renewcommand\\subsection{\\@startsection{subsection}{2}{\\z@}%",
+      "  {-2.8ex \\@plus -1ex \\@minus -.2ex}%",
+      "  {1ex \\@plus .2ex}%",
+      "  {\\normalfont\\sffamily\\Large\\bfseries\\color{bookaccent}}}",
+      "\\renewcommand\\subsubsection{\\@startsection{subsubsection}{3}{\\z@}%",
+      "  {-2.3ex \\@plus -1ex \\@minus -.2ex}%",
+      "  {.8ex \\@plus .2ex}%",
+      "  {\\normalfont\\sffamily\\normalsize\\bfseries\\color{bookaccent}}}",
+      "\\makeatother",
       "",
       "\\lstset{",
-      "  basicstyle=\\ttfamily\\small,",
+      "  basicstyle=\\ttfamily\\footnotesize\\color{codeforeground},",
+      "  identifierstyle=\\color{codeforeground},",
+      "  keywordstyle=\\bfseries\\color{codekeyword},",
+      "  commentstyle=\\itshape\\color{codecomment},",
+      "  stringstyle=\\color{codestring},",
+      "  numbers=left,",
+      "  numberstyle=\\scriptsize\\color{bookmuted},",
+      "  numbersep=8pt,",
+      "  stepnumber=1,",
       "  breaklines=true,",
+      "  breakatwhitespace=false,",
       "  columns=fullflexible,",
       "  keepspaces=true,",
       "  showstringspaces=false,",
       "  frame=single,",
-      "  rulecolor=\\color{black!20},",
-      "  backgroundcolor=\\color{black!3}",
+      "  framerule=0.4pt,",
+      "  rulecolor=\\color{coderule},",
+      "  backgroundcolor=\\color{codebackground},",
+      "  xleftmargin=2.6em,",
+      "  framexleftmargin=2.1em,",
+      "  xrightmargin=0.5em,",
+      "  postbreak=\\mbox{\\textcolor{bookmuted}{$\\hookrightarrow$}\\space},",
+      `  literate=${renderVietnameseListingsMappings()},`,
+      "  aboveskip=0.9em,",
+      "  belowskip=0.9em",
       "}",
     ].join("\n");
   }
 
-  private renderDocumentHeader(document: ChatDocumentAst): string {
-    const title = escapeLatexText(document.title || "Untitled conversation");
+  private renderFontConfiguration(language: DocumentLanguage): string[] {
+    return [
+      "\\IfFileExists{fontspec.sty}{",
+      "  \\usepackage{fontspec}",
+      "  \\setmainfont{Latin Modern Roman}",
+      "  \\setsansfont{Latin Modern Sans}",
+      "  \\setmonofont{Latin Modern Mono}",
+      ...(language === "vi"
+        ? [
+            "  \\IfFileExists{polyglossia.sty}{",
+            "    \\usepackage{polyglossia}",
+            "    \\setdefaultlanguage{vietnamese}",
+            "  }{}",
+          ]
+        : []),
+      "}{}",
+    ];
+  }
+
+  private renderCover(
+    document: ChatDocumentAst,
+    labels: BookLabels,
+  ): string {
+    const title = escapeNormalizedText(
+      document.title || "Untitled conversation",
+    );
 
     const sourceUrl = escapeLatexUrl(document.url);
 
     return [
-      `\\title{${title}}`,
-      "\\author{ChatTeX Exporter}",
-      "\\date{}",
-      "\\maketitle",
-      "",
-      "\\begin{center}",
-      "\\small",
-      `Source: \\href{${sourceUrl}}{ChatGPT conversation}`,
-      "\\end{center}",
-      "",
-      "\\vspace{4mm}",
+      "\\begin{titlepage}",
+      "\\thispagestyle{empty}",
+      "\\vspace*{\\fill}",
+      "\\noindent\\textcolor{bookaccent}{\\rule{42mm}{1.4pt}}",
+      "\\par\\vspace{7mm}",
+      "{\\sffamily\\small\\bfseries\\MakeUppercase{Chat2TeX Edition}}",
+      "\\par\\vspace{5mm}",
+      `{\\Huge\\bfseries ${title}\\par}`,
+      "\\vspace{5mm}",
+      `{\\Large\\color{bookmuted}${escapeNormalizedText(
+        labels.subtitle,
+      )}\\par}`,
+      "\\vfill",
+      "\\noindent\\textcolor{bookrule}{\\rule{\\linewidth}{0.4pt}}",
+      "\\par\\vspace{3mm}",
+      "{\\sffamily\\footnotesize\\color{bookmuted}",
+      `${escapeNormalizedText(labels.source)}: \\url{${sourceUrl}}`,
+      `\\par ${escapeNormalizedText(labels.attribution)}}`,
+      "\\end{titlepage}",
     ].join("\n");
   }
 
-  private renderMessage(message: ChatMessageAst): string {
-    const roleTitle = message.role === "user" ? "User" : "Assistant";
+  private renderContents(document: ChatDocumentAst): string {
+    const title = escapeNormalizedText(
+      document.title || "Untitled conversation",
+    );
+
+    return [
+      "\\clearpage",
+      "\\pagenumbering{roman}",
+      "\\pagestyle{plain}",
+      "\\tableofcontents",
+      "\\clearpage",
+      "\\pagenumbering{arabic}",
+      `\\setchatbooktitle{${title}}`,
+      "\\markright{}",
+      "\\pagestyle{chatbook}",
+    ].join("\n");
+  }
+
+  private findMessageHeadingBaseLevel(message: ChatMessageAst): number {
+    let minimumLevel: number | null = null;
+
+    for (const block of message.blocks) {
+      const level = this.findMinimumHeadingLevel(block);
+
+      if (level !== null) {
+        minimumLevel =
+          minimumLevel === null ? level : Math.min(minimumLevel, level);
+      }
+    }
+
+    return minimumLevel ?? 1;
+  }
+
+  private findMinimumHeadingLevel(block: BlockNode): number | null {
+    if (block.type === "heading") {
+      return block.level;
+    }
+
+    const nestedBlocks =
+      block.type === "quote"
+        ? block.blocks
+        : block.type === "list"
+          ? block.items.flatMap((item) => item.blocks)
+          : [];
+
+    let minimumLevel: number | null = null;
+
+    for (const nestedBlock of nestedBlocks) {
+      const level = this.findMinimumHeadingLevel(nestedBlock);
+
+      if (level !== null) {
+        minimumLevel =
+          minimumLevel === null ? level : Math.min(minimumLevel, level);
+      }
+    }
+
+    return minimumLevel;
+  }
+
+  private renderMessage(
+    message: ChatMessageAst,
+    headingBaseLevel: number,
+    headingLevelOffset: 0 | 1,
+    language: DocumentLanguage,
+    labels: BookLabels,
+    questionNumber: number,
+  ): string {
+    const context: BlockRenderContext = {
+      numberedHeadings: message.role === "assistant",
+      headingBaseLevel,
+      headingLevelOffset,
+    };
 
     const content = message.blocks
-      .map((block) => this.renderBlock(block))
+      .map((block) => this.renderBlock(block, context))
       .filter(Boolean)
       .join("\n\n");
 
-    return [
-      `\\chatmessageheader{${roleTitle}}`,
-      content || "\\emph{Empty message}",
-      "\\par\\medskip",
-    ].join("\n");
+    const renderedContent = content || "\\emph{Empty message}";
+
+    if (message.role === "user") {
+      const questionTitle = escapeNormalizedText(
+        this.createQuestionTitle(message, questionNumber, language),
+      );
+      const questionLabel = escapeNormalizedText(
+        `${labels.question} ${questionNumber}`,
+      );
+
+      return [
+        `\\chatquestionsection{${questionTitle}}`,
+        `\\begin{readerquestion}{${questionLabel}}`,
+        renderedContent,
+        "\\end{readerquestion}",
+      ].join("\n");
+    }
+
+    return [renderedContent, "\\par\\bigskip"].join("\n");
   }
 
-  private renderBlock(block: BlockNode): string {
+  private createQuestionTitle(
+    message: ChatMessageAst,
+    questionNumber: number,
+    language: DocumentLanguage,
+  ): string {
+    const questionText = message.blocks
+      .map((block) => this.renderRawBlockText(block))
+      .join(" ");
+    const conciseTitle = truncateAtWordBoundary(questionText, 80);
+
+    if (conciseTitle) {
+      return conciseTitle;
+    }
+
+    return language === "vi"
+      ? `Câu hỏi ${questionNumber}`
+      : `Question ${questionNumber}`;
+  }
+
+  private renderRawBlockText(block: BlockNode): string {
+    switch (block.type) {
+      case "paragraph":
+      case "heading":
+        return this.renderRawInlineNodes(block.children);
+
+      case "code":
+        return block.code;
+
+      case "list":
+        return block.items
+          .flatMap((item) =>
+            item.blocks.map((child) => this.renderRawBlockText(child)),
+          )
+          .join(" ");
+
+      case "quote":
+        return block.blocks
+          .map((child) => this.renderRawBlockText(child))
+          .join(" ");
+
+      case "table":
+        return block.rows
+          .flatMap((row) =>
+            row.cells.map((cell) =>
+              this.renderRawInlineNodes(cell.children),
+            ),
+          )
+          .join(" ");
+
+      case "math":
+        return block.latex;
+
+      case "image":
+        return block.alt;
+
+      case "horizontal-rule":
+        return "";
+    }
+  }
+
+  private renderRawInlineNodes(nodes: InlineNode[]): string {
+    return nodes.map((node) => this.renderRawInlineNode(node)).join("");
+  }
+
+  private renderRawInlineNode(node: InlineNode): string {
+    switch (node.type) {
+      case "text":
+      case "inline-code":
+        return node.value;
+
+      case "strong":
+      case "emphasis":
+      case "strike":
+        return this.renderRawInlineNodes(node.children);
+
+      case "link":
+        return this.renderRawInlineNodes(node.children) || node.href;
+
+      case "inline-math":
+        return node.latex;
+
+      case "inline-image":
+        return node.alt || "image";
+
+      case "line-break":
+        return " ";
+    }
+  }
+
+  private renderBlock(
+    block: BlockNode,
+    context: BlockRenderContext,
+  ): string {
     switch (block.type) {
       case "paragraph":
         return this.renderInlineNodes(block.children);
 
       case "heading":
-        return this.renderHeading(block.level, block.children);
+        return this.renderHeading(block.level, block.children, context);
 
       case "code":
         return this.renderCodeBlock(block.language, block.code);
 
       case "list":
-        return this.renderList(block);
+        return this.renderList(block, context);
 
       case "quote":
         return [
           "\\begin{quote}",
-          block.blocks.map((child) => this.renderBlock(child)).join("\n\n"),
+          "\\color{bookmuted}\\itshape",
+          "\\noindent\\textcolor{bookaccent}{\\rule{18mm}{0.8pt}}",
+          "\\par\\smallskip",
+          block.blocks
+            .map((child) => this.renderBlock(child, context))
+            .join("\n\n"),
           "\\end{quote}",
         ].join("\n");
 
@@ -174,14 +542,23 @@ export class LatexGenerator {
         return this.renderBlockImage(block.src, block.alt);
 
       case "horizontal-rule":
-        return ["\\par", "\\noindent\\rule{\\linewidth}{0.4pt}", "\\par"].join(
-          "\n",
-        );
+        return [
+          "\\par\\medskip",
+          "\\begin{center}",
+          "\\textcolor{bookaccent}{\\rule{36mm}{0.8pt}}",
+          "\\end{center}",
+          "\\medskip",
+        ].join("\n");
     }
   }
 
-  private renderHeading(level: number, children: InlineNode[]): string {
-    const content = this.renderInlineNodes(children);
+  private renderHeading(
+    level: number,
+    children: InlineNode[],
+    context: BlockRenderContext,
+  ): string {
+    const content = this.renderHeadingInlineNodes(children);
+    const plainContent = this.renderPlainInlineNodes(children);
 
     const commands: Readonly<Record<number, string>> = {
       1: "section",
@@ -191,28 +568,94 @@ export class LatexGenerator {
       5: "subparagraph",
     };
 
-    const command = commands[level];
+    const normalizedLevel = context.numberedHeadings
+      ? Math.max(1, level - context.headingBaseLevel + 1) +
+        context.headingLevelOffset
+      : level;
+
+    const command = commands[normalizedLevel];
 
     if (!command) {
       return `\\textbf{${content}}`;
     }
 
-    return `\\${command}*{${content}}`;
+    const canBeNumbered =
+      context.numberedHeadings && normalizedLevel <= 3;
+
+    return canBeNumbered
+      ? `\\${command}[${plainContent}]{${content}}`
+      : `\\${command}*{${content}}`;
+  }
+
+  private renderHeadingInlineNodes(nodes: InlineNode[]): string {
+    return nodes.map((node) => this.renderHeadingInlineNode(node)).join("");
+  }
+
+  private renderHeadingInlineNode(node: InlineNode): string {
+    switch (node.type) {
+      case "text":
+        return escapeNormalizedText(node.value);
+
+      case "strong":
+      case "strike":
+        return this.renderHeadingInlineNodes(node.children);
+
+      case "emphasis":
+        return [
+          "\\emph{",
+          this.renderHeadingInlineNodes(node.children),
+          "}",
+        ].join("");
+
+      case "inline-code":
+        return `\\texttt{${escapeNormalizedText(node.value)}}`;
+
+      case "link":
+        return (
+          this.renderHeadingInlineNodes(node.children) ||
+          escapeNormalizedText(node.href)
+        );
+
+      case "inline-math":
+        return `$${node.latex.trim()}$`;
+
+      case "inline-image":
+        return escapeNormalizedText(node.alt || "image");
+
+      case "line-break":
+        return " ";
+    }
   }
 
   private renderCodeBlock(language: string | null, code: string): string {
     const listingLanguage = mapListingLanguage(language);
+    const displayLanguage = listingLanguage ?? language?.trim() ?? "";
 
-    const option = listingLanguage ? `[language=${listingLanguage}]` : "";
+    const options = listingLanguage ? `[language=${listingLanguage}]` : "";
+    const languageLabel = displayLanguage
+      ? `{\\sffamily\\scriptsize\\bfseries\\color{codelabel}\\MakeUppercase{${escapeNormalizedText(
+          displayLanguage,
+        )}}\\par}`
+      : "";
 
-    const safeCode = code.replace(/\\end\{lstlisting\}/g, "\\end {lstlisting}");
+    const safeCode = code
+      .normalize("NFC")
+      .replace(/\\end\{lstlisting\}/g, "\\end {lstlisting}");
 
-    return [`\\begin{lstlisting}${option}`, safeCode, "\\end{lstlisting}"].join(
-      "\n",
-    );
+    return [
+      languageLabel,
+      `\\begin{lstlisting}${options}`,
+      safeCode,
+      "\\end{lstlisting}",
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
-  private renderList(block: ListBlock): string {
+  private renderList(
+    block: ListBlock,
+    context: BlockRenderContext,
+  ): string {
     const environment = block.ordered ? "enumerate" : "itemize";
 
     const startOption =
@@ -223,7 +666,7 @@ export class LatexGenerator {
     const items = block.items
       .map((item) => {
         const itemContent = item.blocks
-          .map((child) => this.renderBlock(child))
+          .map((child) => this.renderBlock(child, context))
           .join("\n\n");
 
         return ["\\item", itemContent].join(" ");
@@ -247,9 +690,13 @@ export class LatexGenerator {
       1,
     );
 
-    const columnDefinition = "l".repeat(columnCount);
+    const columnWidth =
+      `p{\\dimexpr(\\linewidth-${columnCount * 2}\\tabcolsep)` +
+      `/${columnCount}\\relax}`;
 
-    const rows = block.rows.map((row, rowIndex) => {
+    const columnDefinition = columnWidth.repeat(columnCount);
+
+    const renderedRows = block.rows.map((row) => {
       const cells = Array.from({ length: columnCount }, (_, columnIndex) => {
         const cell = row.cells[columnIndex];
 
@@ -262,20 +709,34 @@ export class LatexGenerator {
         return cell.header ? `\\textbf{${content}}` : content;
       });
 
-      const renderedRow = `${cells.join(" & ")} \\\\`;
-
-      const isHeaderRow =
-        rowIndex === 0 &&
-        row.cells.length > 0 &&
-        row.cells.every((cell) => cell.header);
-
-      return isHeaderRow ? `${renderedRow}\n\\midrule` : renderedRow;
+      return `${cells.join(" & ")} \\\\`;
     });
+
+    const firstRow = block.rows[0];
+
+    const hasHeader =
+      firstRow.cells.length > 0 &&
+      firstRow.cells.every((cell) => cell.header);
+
+    const header = hasHeader ? renderedRows[0] : null;
+
+    const bodyRows = hasHeader ? renderedRows.slice(1) : renderedRows;
 
     return [
       `\\begin{longtable}{${columnDefinition}}`,
       "\\toprule",
-      ...rows,
+      ...(header
+        ? [
+            header,
+            "\\midrule",
+            "\\endfirsthead",
+            "\\toprule",
+            header,
+            "\\midrule",
+            "\\endhead",
+          ]
+        : []),
+      ...bodyRows,
       "\\bottomrule",
       "\\end{longtable}",
     ].join("\n");
@@ -285,10 +746,44 @@ export class LatexGenerator {
     return nodes.map((node) => this.renderInlineNode(node)).join("");
   }
 
+  private renderPlainInlineNodes(nodes: InlineNode[]): string {
+    return nodes.map((node) => this.renderPlainInlineNode(node)).join("");
+  }
+
+  private renderPlainInlineNode(node: InlineNode): string {
+    switch (node.type) {
+      case "text":
+        return escapeNormalizedText(node.value);
+
+      case "strong":
+      case "emphasis":
+      case "strike":
+        return this.renderPlainInlineNodes(node.children);
+
+      case "inline-code":
+        return escapeNormalizedText(node.value);
+
+      case "link":
+        return (
+          this.renderPlainInlineNodes(node.children) ||
+          escapeNormalizedText(node.href)
+        );
+
+      case "inline-math":
+        return escapeNormalizedText(node.latex);
+
+      case "inline-image":
+        return escapeNormalizedText(node.alt || "image");
+
+      case "line-break":
+        return " ";
+    }
+  }
+
   private renderInlineNode(node: InlineNode): string {
     switch (node.type) {
       case "text":
-        return escapeLatexText(node.value);
+        return escapeNormalizedText(node.value);
 
       case "strong":
         return ["\\textbf{", this.renderInlineNodes(node.children), "}"].join(
@@ -309,7 +804,8 @@ export class LatexGenerator {
           "\\href{",
           escapeLatexUrl(node.href),
           "}{",
-          this.renderInlineNodes(node.children) || escapeLatexText(node.href),
+          this.renderInlineNodes(node.children) ||
+            escapeNormalizedText(node.href),
           "}",
         ].join("");
 
@@ -327,16 +823,25 @@ export class LatexGenerator {
   private renderBlockImage(sourceUrl: string, alt: string): string {
     const asset = this.registerImage(sourceUrl, alt);
 
-    const safeAlt = escapeLatexText(alt.trim() || "Image unavailable");
+    const safeAlt = escapeNormalizedText(
+      alt.trim() || "Image unavailable",
+    );
+    const caption = alt.trim()
+      ? `{\\small\\itshape\\color{bookmuted}${escapeNormalizedText(
+          alt.trim(),
+        )}\\par}`
+      : "";
 
     return [
       "\\begin{center}",
       `\\IfFileExists{${asset.outputPath}}{`,
       "  \\includegraphics[",
       "    width=\\linewidth,",
-      "    height=0.75\\textheight,",
+      "    height=0.7\\textheight,",
       "    keepaspectratio",
       `  ]{${asset.outputPath}}`,
+      caption ? "  \\par\\smallskip" : "",
+      caption ? `  ${caption}` : "",
       "}{",
       "  \\fbox{",
       "    \\parbox{0.85\\linewidth}{",
@@ -345,7 +850,9 @@ export class LatexGenerator {
       "  }",
       "}",
       "\\end{center}",
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
   private renderInlineImage(sourceUrl: string, alt: string): string {
@@ -360,7 +867,7 @@ export class LatexGenerator {
       `    ]{${asset.outputPath}}`,
       "  }",
       "}{",
-      `  \\texttt{[${escapeLatexText(alt || "image")}]}`,
+      `  \\texttt{[${escapeNormalizedText(alt || "image")}]}`,
       "}",
     ].join("\n");
   }
@@ -425,4 +932,42 @@ function mapListingLanguage(language: string | null): string | null {
   };
 
   return languageMap[normalized] ?? null;
+}
+
+function detectDocumentLanguage(
+  document: ChatDocumentAst,
+): DocumentLanguage {
+  return VIETNAMESE_CHARACTER_PATTERN.test(
+    JSON.stringify(document).normalize("NFC"),
+  )
+    ? "vi"
+    : "en";
+}
+
+function escapeNormalizedText(value: string): string {
+  return escapeLatexText(value.normalize("NFC"));
+}
+
+function renderVietnameseListingsMappings(): string {
+  return Array.from(VIETNAMESE_LISTINGS_CHARACTERS)
+    .map((character) => `{${character}}{{${character}}}1`)
+    .join(" ");
+}
+
+function truncateAtWordBoundary(value: string, limit: number): string {
+  const normalized = value.normalize("NFC").replace(/\s+/gu, " ").trim();
+  const characters = Array.from(normalized);
+
+  if (characters.length <= limit) {
+    return normalized;
+  }
+
+  const prefix = characters.slice(0, limit - 1).join("");
+  const wordBoundary = prefix.lastIndexOf(" ");
+  const truncated =
+    wordBoundary >= Math.floor(limit * 0.55)
+      ? prefix.slice(0, wordBoundary)
+      : prefix;
+
+  return `${truncated.trim()}…`;
 }

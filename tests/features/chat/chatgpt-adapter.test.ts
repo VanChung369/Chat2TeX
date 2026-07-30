@@ -79,6 +79,70 @@ describe("ChatGPTAdapter", () => {
     expect(conversation.messages[1].html).not.toContain("<button");
   });
 
+  it("preserves every sibling Markdown section in one message", () => {
+    const testDocument = createTestDocument(`
+      <article data-testid="conversation-turn-0">
+        <div
+          data-message-author-role="assistant"
+          data-message-id="assistant-multipart"
+        >
+          <div class="markdown"><p>First section</p></div>
+          <div class="markdown"><p>Second section</p></div>
+        </div>
+      </article>
+    `);
+
+    const [message] = new ChatGPTAdapter(
+      testDocument,
+    ).extractMountedMessages();
+
+    expect(message.text).toContain("First section");
+    expect(message.text).toContain("Second section");
+    expect(message.html.match(/First section/g)).toHaveLength(1);
+    expect(message.html.match(/Second section/g)).toHaveLength(1);
+  });
+
+  it("does not duplicate nested content candidates", () => {
+    const testDocument = createTestDocument(`
+      <article data-testid="conversation-turn-0">
+        <div
+          data-message-author-role="assistant"
+          data-message-id="assistant-nested"
+        >
+          <div data-message-content>
+            <div class="markdown"><p>Nested once</p></div>
+          </div>
+        </div>
+      </article>
+    `);
+
+    const [message] = new ChatGPTAdapter(
+      testDocument,
+    ).extractMountedMessages();
+
+    expect(message.html.match(/Nested once/g)).toHaveLength(1);
+  });
+
+  it("reports whether the first numbered conversation turn is mounted", () => {
+    const firstTurn = createTestDocument(`
+      <article data-testid="conversation-turn-0"></article>
+      <article data-testid="conversation-turn-1"></article>
+    `);
+
+    const partialTurns = createTestDocument(`
+      <article data-testid="conversation-turn-8"></article>
+      <article data-testid="conversation-turn-9"></article>
+    `);
+
+    const unknownTurns = createTestDocument(`
+      <article data-testid="conversation-turn-latest"></article>
+    `);
+
+    expect(new ChatGPTAdapter(firstTurn).hasConversationStart()).toBe(true);
+    expect(new ChatGPTAdapter(partialTurns).hasConversationStart()).toBe(false);
+    expect(new ChatGPTAdapter(unknownTurns).hasConversationStart()).toBeNull();
+  });
+
   it("preserves generated images for LaTeX asset collection", () => {
     const testDocument = createTestDocument(`
       <article data-testid="conversation-turn-0">

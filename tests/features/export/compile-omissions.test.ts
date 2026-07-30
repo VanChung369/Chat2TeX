@@ -8,6 +8,7 @@ describe("applyCompileOmissions", () => {
       {
         title: "Test",
         url: "https://chatgpt.com/c/test",
+        messageCount: 2,
         latexSource: "source",
         assets: [
           {
@@ -70,6 +71,7 @@ describe("applyCompileOmissions", () => {
       {
         title: "Test",
         url: "https://chatgpt.com/c/test",
+        messageCount: 2,
         latexSource: "source",
         assets: [
           {

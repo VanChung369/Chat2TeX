@@ -18,6 +18,7 @@ export interface ConversationViewport {
 export interface ConversationReader {
   extractMountedMessages(): ChatMessage[];
   extractConversation(): ChatConversation;
+  hasConversationStart(): boolean | null;
 }
 
 export interface CollectionProgress {
@@ -25,17 +26,20 @@ export interface CollectionProgress {
   collectedMessages: number;
   mountedMessages: number;
   reachedTop: boolean;
+  conversationStartFound: boolean | null;
 }
 
 export interface ConversationCollectorOptions {
   maxPasses?: number;
   stableTopPasses?: number;
+  unknownTopPasses?: number;
   topTolerance?: number;
 }
 
 const DEFAULT_OPTIONS: Required<ConversationCollectorOptions> = {
   maxPasses: 120,
   stableTopPasses: 2,
+  unknownTopPasses: 6,
   topTolerance: 2,
 };
 
@@ -76,14 +80,26 @@ export class ConversationCollector {
         const reachedTop =
           currentViewport.scrollTop <= this.options.topTolerance;
 
+        const conversationStartFound =
+          this.reader.hasConversationStart();
+
         onProgress?.({
           pass,
           collectedMessages: collectedMessages.size,
           mountedMessages: mountedMessages.length,
           reachedTop,
+          conversationStartFound,
         });
 
         if (reachedTop) {
+          if (conversationStartFound === false) {
+            previousTopSignature = "";
+            stableTopPasses = 0;
+            this.viewport.scrollToTop();
+            await this.viewport.waitForSettle();
+            continue;
+          }
+
           const topSignature = [
             currentViewport.scrollHeight,
             collectedMessages.size,
@@ -96,7 +112,12 @@ export class ConversationCollector {
             stableTopPasses = 0;
           }
 
-          if (stableTopPasses >= this.options.stableTopPasses) {
+          const requiredStablePasses =
+            conversationStartFound === null
+              ? this.options.unknownTopPasses
+              : this.options.stableTopPasses;
+
+          if (stableTopPasses >= requiredStablePasses) {
             break;
           }
 

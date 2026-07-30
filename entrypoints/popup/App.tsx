@@ -184,6 +184,10 @@ export default function App() {
                 <section className="export-ready">
                   <strong>Export is ready to compile</strong>
 
+                  <p>
+                    {exportFlow.prepared.messageCount} messages collected
+                  </p>
+
                   <p>{exportFlow.prepared.assets.length} images detected</p>
 
                   <p>
