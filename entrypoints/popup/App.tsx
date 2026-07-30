@@ -10,12 +10,6 @@ import {
   type ChatTexExtractConversationResponse,
 } from "@/src/shared/messages";
 
-import {
-  CHATTEX_COLLECT_CONVERSATION,
-  type ChatTexCollectConversationRequest,
-  type ChatTexCollectConversationResponse,
-} from "@/src/shared/messages";
-
 type DetectionStatus = "loading" | "ready" | "unsupported" | "error";
 
 interface ConversationInfo {

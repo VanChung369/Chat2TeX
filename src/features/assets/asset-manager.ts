@@ -89,7 +89,7 @@ export class AssetManager {
     let response: Response;
 
     try {
-      response = await this.fetcher(parsedUrl.href, {
+      response = await this.fetcher.call(globalThis, parsedUrl.href, {
         method: "GET",
         credentials: "omit",
         redirect: "follow",
@@ -101,6 +101,7 @@ export class AssetManager {
         },
       });
     } catch (error) {
+      console.log("Fetching image from URL:", error);
       return {
         ok: false,
         code: "download-failed",

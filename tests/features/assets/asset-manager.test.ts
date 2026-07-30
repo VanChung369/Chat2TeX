@@ -73,6 +73,37 @@ describe("AssetManager", () => {
     );
   });
 
+  it("uses the global receiver required by worker fetch", async () => {
+    async function workerFetcher(
+      this: unknown,
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ): Promise<Response> {
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+
+      return new Response("image-data", {
+        status: 200,
+        headers: {
+          "content-type": "image/webp",
+        },
+      });
+    }
+
+    const manager = new AssetManager(
+      createPermissionChecker(true),
+      workerFetcher,
+      createConverter(),
+    );
+
+    const result = await manager.resolve(asset);
+
+    expect(result).toMatchObject({
+      ok: true,
+    });
+  });
+
   it("returns the required origin permission", async () => {
     const manager = new AssetManager(
       createPermissionChecker(false),

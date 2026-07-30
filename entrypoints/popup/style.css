@@ -92,7 +92,7 @@ button:focus-visible {
   place-items: center;
   border-radius: 12px;
   color: #172033;
-  background: #ffffff;
+
   font-family: Georgia, serif;
   font-size: 18px;
   font-weight: 700;
@@ -128,7 +128,6 @@ button:focus-visible {
   padding: 14px;
   border: 1px solid #dfe4ec;
   border-radius: 12px;
-  background: #ffffff;
 }
 
 .status__indicator {
@@ -174,7 +173,6 @@ button:focus-visible {
   padding: 14px;
   border: 1px solid #dfe4ec;
   border-radius: 12px;
-  background: #ffffff;
 }
 
 .conversation__label {
@@ -216,7 +214,6 @@ button:focus-visible {
 .button--secondary {
   border: 1px solid #ccd3df;
   color: #172033;
-  background: #ffffff;
 }
 
 .button--secondary:hover {
@@ -248,7 +245,6 @@ button:focus-visible {
   padding: 14px;
   border: 1px solid #dfe4ec;
   border-radius: 12px;
-  background: #ffffff;
 }
 
 .permission-card strong,
