@@ -68,7 +68,7 @@ describe("AssetManager", () => {
     expect(fetcher).toHaveBeenCalledWith(
       asset.sourceUrl,
       expect.objectContaining({
-        credentials: "omit",
+        credentials: "include",
       }),
     );
   });

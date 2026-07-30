@@ -11,6 +11,10 @@ import { ImageDataProcessor } from "@/src/features/assets/image-data-processor";
 import {
   isConvertImageDataRequest,
   isProcessImageAssetRequest,
+  CHATTEX_COMPILE_IN_OFFSCREEN,
+  isCompileLatexRequest,
+  type ChatTexCompileInOffscreenRequest,
+  type ChatTexCompileInOffscreenResponse,
 } from "@/src/shared/messages";
 
 export default defineBackground(() => {
@@ -62,6 +66,25 @@ export default defineBackground(() => {
         return true;
       }
 
+      if (isCompileLatexRequest(message)) {
+        void compileInOffscreen(message.project)
+          .then(sendResponse)
+          .catch((error) => {
+            sendResponse({
+              ok: false,
+
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to start compiler.",
+
+              log: "",
+            });
+          });
+
+        return true;
+      }
+
       return;
     },
   );
@@ -85,4 +108,53 @@ function isTrustedSender(sender: Browser.runtime.MessageSender): boolean {
 
 function readErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown background error.";
+}
+
+let creatingOffscreenDocument: Promise<void> | null = null;
+
+async function compileInOffscreen(
+  project: ChatTexCompileInOffscreenRequest["project"],
+): Promise<ChatTexCompileInOffscreenResponse> {
+  await ensureCompilerDocument();
+
+  const request: ChatTexCompileInOffscreenRequest = {
+    type: CHATTEX_COMPILE_IN_OFFSCREEN,
+
+    project,
+  };
+
+  return browser.runtime.sendMessage(
+    request,
+  ) as Promise<ChatTexCompileInOffscreenResponse>;
+}
+
+async function ensureCompilerDocument(): Promise<void> {
+  const documentUrl = browser.runtime.getURL("/compiler.html");
+
+  const contexts = await browser.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+
+    documentUrls: [documentUrl],
+  });
+
+  if (contexts.length > 0) {
+    return;
+  }
+
+  if (!creatingOffscreenDocument) {
+    creatingOffscreenDocument = browser.offscreen
+      .createDocument({
+        url: "compiler.html",
+
+        reasons: [browser.offscreen.Reason.WORKERS],
+
+        justification:
+          "Run the XeLaTeX WebAssembly compiler without blocking the popup.",
+      })
+      .finally(() => {
+        creatingOffscreenDocument = null;
+      });
+  }
+
+  await creatingOffscreenDocument;
 }

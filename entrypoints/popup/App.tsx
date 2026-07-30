@@ -191,9 +191,40 @@ export default function App() {
                       not be loaded.
                     </p>
                   )}
+
+                  <button
+                    className="button button--primary"
+                    type="button"
+                    onClick={() => {
+                      void exportFlow.compile();
+                    }}
+                  >
+                    Compile PDF
+                  </button>
                 </section>
               )}
 
+            {exportFlow.phase === "compiling" && (
+              <section className="progress-card">
+                <strong>Compiling XeLaTeX</strong>
+
+                <p>Loading TeX Live packages and generating the PDF...</p>
+
+                <progress />
+              </section>
+            )}
+            {exportFlow.phase === "compiled" && exportFlow.pdfBase64 && (
+              <section className="export-ready">
+                <strong>PDF compiled successfully</strong>
+
+                <p>
+                  PDF size:{" "}
+                  {formatFileSize(
+                    Math.floor(exportFlow.pdfBase64.length * 0.75),
+                  )}
+                </p>
+              </section>
+            )}
             {exportFlow.phase === "error" && exportFlow.error && (
               <p className="collection-error">{exportFlow.error}</p>
             )}
@@ -263,4 +294,16 @@ function StatusCard({ variant, title, description }: StatusCardProps) {
       </div>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

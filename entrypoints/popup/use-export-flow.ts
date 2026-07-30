@@ -23,6 +23,9 @@ import {
   type ChatTexProcessImageAssetRequest,
   type ChatTexReadPageImageRequest,
   type ChatTexReadPageImageResponse,
+  CHATTEX_COMPILE_LATEX,
+  type ChatTexCompileLatexRequest,
+  type ChatTexCompileInOffscreenResponse,
 } from "@/src/shared/messages";
 
 export type ExportPhase =
@@ -31,6 +34,8 @@ export type ExportPhase =
   | "permission-required"
   | "processing-assets"
   | "ready"
+  | "compiling"
+  | "compiled"
   | "error";
 
 export function useExportFlow() {
@@ -46,6 +51,10 @@ export function useExportFlow() {
   const [progress, setProgress] = useState<ExportProgress | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+
+  const [compileLog, setCompileLog] = useState("");
 
   async function prepare(): Promise<void> {
     setPhase("preparing");
@@ -166,6 +175,50 @@ export function useExportFlow() {
     setPhase("ready");
   }
 
+  async function compile(): Promise<void> {
+    if (!prepared || !processedAssets) {
+      return;
+    }
+
+    setPhase("compiling");
+    setError(null);
+    setCompileLog("");
+
+    try {
+      const request: ChatTexCompileLatexRequest = {
+        type: CHATTEX_COMPILE_LATEX,
+
+        project: {
+          source: prepared.latexSource,
+
+          files: processedAssets.files.map((file) => ({
+            path: file.outputPath,
+
+            base64: file.base64,
+          })),
+        },
+      };
+
+      const response = (await browser.runtime.sendMessage(
+        request,
+      )) as ChatTexCompileInOffscreenResponse;
+
+      setCompileLog(response.log);
+
+      if (!response.ok) {
+        throw new Error(response.error);
+      }
+
+      setPdfBase64(response.pdfBase64);
+
+      setPhase("compiled");
+    } catch (caughtError) {
+      setError(readErrorMessage(caughtError));
+
+      setPhase("error");
+    }
+  }
+
   return {
     phase,
     prepared,
@@ -173,8 +226,11 @@ export function useExportFlow() {
     missingOrigins,
     progress,
     error,
+    pdfBase64,
+    compileLog,
     prepare,
     grantPermissions,
+    compile,
   };
 }
 

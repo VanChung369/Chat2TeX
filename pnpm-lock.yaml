@@ -14,6 +14,9 @@ importers:
       react-dom:
         specifier: ^19.2.4
         version: 19.2.8(react@19.2.8)
+      texlyre-busytex:
+        specifier: npm:@vanabel/texlyre-busytex@0.1.10-beta
+        version: '@vanabel/texlyre-busytex@0.1.10-beta'
     devDependencies:
       '@types/react':
         specifier: ^19.2.14
@@ -569,6 +572,10 @@ packages:
 
   '@types/webextension-polyfill@0.12.5':
     resolution: {integrity: sha512-uKSAv6LgcVdINmxXMKBuVIcg/2m5JZugoZO8x20g7j2bXJkPIl/lVGQcDlbV+aXAiTyXT2RA5U5mI4IGCDMQeg==}
+
+  '@vanabel/texlyre-busytex@0.1.10-beta':
+    resolution: {integrity: sha512-SHLHCdm3qWWFHFTEsUn6fuNBIJqaKMdgEC993MHU3Rhb/LEMbRpfP1wD/vmNBuJrK990Ag/EIsQpkU5SAptZFg==}
+    hasBin: true
 
   '@vitejs/plugin-react@6.0.4':
     resolution: {integrity: sha512-XcCQz0TBpBgljhj0gMuuDj49i6Ytqh5q1osT/Gp5uAVJUCTWxyskk/l1jwYYiu2xcNHHipdMz40EGfM1VdamVg==}
@@ -2997,6 +3004,8 @@ snapshots:
       csstype: 3.2.3
 
   '@types/webextension-polyfill@0.12.5': {}
+
+  '@vanabel/texlyre-busytex@0.1.10-beta': {}
 
   '@vitejs/plugin-react@6.0.4(vite@8.1.5(@types/node@26.1.2)(esbuild@0.27.7)(jiti@2.7.0))':
     dependencies:

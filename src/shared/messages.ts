@@ -10,6 +10,11 @@ import type {
   PageImageReadResult,
 } from "@/src/features/assets/page-image-reader";
 
+import type {
+  CompileLatexResult,
+  SerializedCompileProject,
+} from "@/src/features/compiler/types";
+
 import type { PreparedExport } from "@/src/features/export/types";
 
 import type { LatexAssetRequest } from "@/src/features/latex/types";
@@ -34,6 +39,11 @@ export const CHATTEX_PREPARE_EXPORT = "CHATTEX_PREPARE_EXPORT" as const;
 export const CHATTEX_READ_PAGE_IMAGE = "CHATTEX_READ_PAGE_IMAGE" as const;
 
 export const CHATTEX_CONVERT_IMAGE_DATA = "CHATTEX_CONVERT_IMAGE_DATA" as const;
+
+export const CHATTEX_COMPILE_LATEX = "CHATTEX_COMPILE_LATEX" as const;
+
+export const CHATTEX_COMPILE_IN_OFFSCREEN =
+  "CHATTEX_COMPILE_IN_OFFSCREEN" as const;
 
 export interface ChatTexPingRequest {
   type: typeof CHAT2TEX_PING;
@@ -207,5 +217,54 @@ function hasAsset(value: unknown): value is {
     typeof asset.sourceUrl === "string" &&
     "outputPath" in asset &&
     typeof asset.outputPath === "string"
+  );
+}
+
+export interface ChatTexCompileLatexRequest {
+  type: typeof CHATTEX_COMPILE_LATEX;
+  project: SerializedCompileProject;
+}
+
+export interface ChatTexCompileInOffscreenRequest {
+  type: typeof CHATTEX_COMPILE_IN_OFFSCREEN;
+
+  project: SerializedCompileProject;
+}
+
+export type ChatTexCompileInOffscreenResponse = CompileLatexResult;
+
+export function isCompileLatexRequest(
+  value: unknown,
+): value is ChatTexCompileLatexRequest {
+  return (
+    hasMessageType(value, CHATTEX_COMPILE_LATEX) && hasCompileProject(value)
+  );
+}
+
+export function isCompileInOffscreenRequest(
+  value: unknown,
+): value is ChatTexCompileInOffscreenRequest {
+  return (
+    hasMessageType(value, CHATTEX_COMPILE_IN_OFFSCREEN) &&
+    hasCompileProject(value)
+  );
+}
+
+function hasCompileProject(value: unknown): value is {
+  project: SerializedCompileProject;
+} {
+  if (typeof value !== "object" || value === null || !("project" in value)) {
+    return false;
+  }
+
+  const project = value.project;
+
+  return (
+    typeof project === "object" &&
+    project !== null &&
+    "source" in project &&
+    typeof project.source === "string" &&
+    "files" in project &&
+    Array.isArray(project.files)
   );
 }
