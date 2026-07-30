@@ -4,6 +4,10 @@ import { browser } from "wxt/browser";
 
 import { getAssetOriginPatterns } from "@/src/features/export/asset-origins";
 
+import { applyCompileOmissions } from "@/src/features/export/compile-omissions";
+
+import { formatCompileFailure } from "@/src/features/compiler/compile-diagnostics";
+
 import type {
   ExportProgress,
   PreparedExport,
@@ -68,6 +72,8 @@ export function useExportFlow() {
     setError(null);
     setProgress(null);
     setProcessedAssets(null);
+    setPdfBase64(null);
+    setCompileLog("");
 
     try {
       const tabId = await getActiveTabId();
@@ -213,8 +219,16 @@ export function useExportFlow() {
       setCompileLog(response.log);
 
       if (!response.ok) {
-        throw new Error(response.error);
+        throw new Error(formatCompileFailure(response.error, response.log));
       }
+
+      const reconciledAssets = applyCompileOmissions(
+        prepared,
+        processedAssets,
+        response.omittedFiles,
+      );
+
+      setProcessedAssets(reconciledAssets);
 
       setPdfBase64(response.pdfBase64);
 

@@ -218,15 +218,35 @@ describe("LatexGenerator", () => {
 
     expect(result.source).toContain("\\usepackage{fontspec}");
 
+    expect(result.source).toContain(
+      [
+        "\\IfFileExists{fontspec.sty}{",
+        "  \\usepackage{fontspec}",
+        "  \\setmainfont{Latin Modern Roman}",
+        "  \\setmonofont{Latin Modern Mono}",
+        "}{}",
+      ].join("\n"),
+    );
+
     expect(result.source).toContain("\\begin{document}");
 
     expect(result.source).toContain("\\end{document}");
 
-    expect(result.source).toContain("\\begin{chatmessage}{User}");
+    expect(result.source).toContain("\\chatmessageheader{User}");
 
-    expect(result.source).toContain("\\begin{chatmessage}{Assistant}");
+    expect(result.source).toContain("\\chatmessageheader{Assistant}");
 
     expect(result.source).toContain("\\IfFileExists{assets/image-001.png}");
+  });
+
+  it("renders message bodies outside memory-heavy boxes", () => {
+    const generator = new LatexGenerator();
+
+    const result = generator.generate(createDocument());
+
+    expect(result.source).not.toContain("\\usepackage[most]{tcolorbox}");
+    expect(result.source).not.toContain("\\newtcolorbox{chatmessage}");
+    expect(result.source).not.toContain("\\begin{chatmessage}");
   });
 
   it("escapes special LaTeX characters in normal text", () => {

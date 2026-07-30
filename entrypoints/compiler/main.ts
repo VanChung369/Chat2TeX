@@ -1,11 +1,10 @@
 import { browser } from "wxt/browser";
 
-import {
-  BusyTexCompileError,
-  BusyTexEngine,
-} from "@/src/features/compiler/busytex-engine";
+import { BusyTexEngine } from "@/src/features/compiler/busytex-engine";
 
 import { LatexCompiler } from "@/src/features/compiler/latex-compiler";
+
+import { readCompileLog } from "@/src/features/compiler/compile-diagnostics";
 
 import { base64ToBytes, bytesToBase64 } from "@/src/shared/base64";
 
@@ -98,6 +97,8 @@ async function compileProject(project: {
       byteLength: result.pdf.byteLength,
 
       log: result.log,
+
+      omittedFiles: result.omittedFiles,
     };
   } catch (error) {
     return {
@@ -105,7 +106,7 @@ async function compileProject(project: {
 
       error: error instanceof Error ? error.message : "Unknown XeLaTeX error.",
 
-      log: error instanceof BusyTexCompileError ? error.compileLog : "",
+      log: readCompileLog(error),
     };
   }
 }

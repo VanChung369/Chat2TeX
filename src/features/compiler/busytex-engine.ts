@@ -3,7 +3,7 @@ import { BusyTexRunner, XeLatex } from "texlyre-busytex";
 import { browser } from "wxt/browser";
 
 import type {
-  LatexCompileOutput,
+  LatexEngineOutput,
   LatexCompileProject,
   LatexEngine,
 } from "./types";
@@ -45,7 +45,7 @@ export class BusyTexEngine implements LatexEngine {
     this.xelatex = new XeLatex(runner, false);
   }
 
-  async compile(project: LatexCompileProject): Promise<LatexCompileOutput> {
+  async compile(project: LatexCompileProject): Promise<LatexEngineOutput> {
     if (!this.xelatex) {
       throw new Error("BusyTeX has not been initialized.");
     }

@@ -27,6 +27,11 @@ export default function App() {
 
   const exportFlow = useExportFlow();
 
+  const compilerRejectedAssets =
+    exportFlow.processedAssets?.failures.filter(
+      (failure) => failure.code === "compiler-rejected",
+    ) ?? [];
+
   useEffect(() => {
     void detectConversation();
   }, []);
@@ -224,6 +229,27 @@ export default function App() {
                   )}
                 </p>
 
+                {compilerRejectedAssets.length > 0 && (
+                  <>
+                    <p className="warning-text">
+                      {compilerRejectedAssets.length} images were omitted from
+                      the PDF.
+                    </p>
+
+                    <details className="diagnostic-details">
+                      <summary>Images omitted from PDF</summary>
+
+                      <ul>
+                        {compilerRejectedAssets.map((failure) => (
+                          <li key={failure.id}>
+                            <strong>{failure.id}</strong>: {failure.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </>
+                )}
+
                 <button
                   className="button button--primary"
                   type="button"
@@ -256,7 +282,19 @@ export default function App() {
               </section>
             )}
             {exportFlow.phase === "error" && exportFlow.error && (
-              <p className="collection-error">{exportFlow.error}</p>
+              <section className="compile-error">
+                <p className="collection-error">{exportFlow.error}</p>
+
+                {!exportFlow.pdfBase64 && exportFlow.compileLog.trim() && (
+                  <details className="diagnostic-details">
+                    <summary>XeLaTeX error details</summary>
+
+                    <pre className="compile-log">
+                      {exportFlow.compileLog}
+                    </pre>
+                  </details>
+                )}
+              </section>
             )}
           </>
         )}

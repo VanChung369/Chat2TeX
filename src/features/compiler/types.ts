@@ -8,15 +8,19 @@ export interface LatexCompileProject {
   files: CompilerFile[];
 }
 
-export interface LatexCompileOutput {
+export interface LatexEngineOutput {
   pdf: Uint8Array;
   log: string;
+}
+
+export interface LatexCompileOutput extends LatexEngineOutput {
+  omittedFiles: string[];
 }
 
 export interface LatexEngine {
   initialize(): Promise<void>;
 
-  compile(project: LatexCompileProject): Promise<LatexCompileOutput>;
+  compile(project: LatexCompileProject): Promise<LatexEngineOutput>;
 
   terminate(): void;
 }
@@ -37,6 +41,7 @@ export type CompileLatexResult =
       pdfBase64: string;
       byteLength: number;
       log: string;
+      omittedFiles: string[];
     }
   | {
       ok: false;

@@ -17,7 +17,8 @@ export type AssetFailureCode =
   | "download-failed"
   | "invalid-content-type"
   | "asset-too-large"
-  | "decode-failed";
+  | "decode-failed"
+  | "compiler-rejected";
 
 export type ResolveAssetResult =
   | {

@@ -309,6 +309,55 @@ button:focus-visible {
   font-size: 12px;
   line-height: 1.4;
 }
+
+.compile-error {
+  display: grid;
+  gap: 10px;
+}
+
+.diagnostic-details {
+  padding: 10px 12px;
+  border: 1px solid #dfe4ec;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.diagnostic-details summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.diagnostic-details ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #657086;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.diagnostic-details li {
+  overflow-wrap: anywhere;
+}
+
+.diagnostic-details li strong {
+  display: inline;
+  margin: 0;
+  font-size: inherit;
+}
+
+.compile-log {
+  max-height: 240px;
+  margin: 10px 0 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 8px;
+  color: #e7edf7;
+  background: #101827;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .download-list {
   margin: 10px 0 0;
   padding-left: 18px;
