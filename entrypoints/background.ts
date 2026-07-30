@@ -13,9 +13,20 @@ import {
   isProcessImageAssetRequest,
   CHATTEX_COMPILE_IN_OFFSCREEN,
   isCompileLatexRequest,
+  CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN,
+  isDownloadExportRequest,
   type ChatTexCompileInOffscreenRequest,
   type ChatTexCompileInOffscreenResponse,
+  type ChatTexDownloadExportResponse,
+  type ChatTexPrepareDownloadsOffscreenRequest,
+  type ChatTexPrepareDownloadsOffscreenResponse,
 } from "@/src/shared/messages";
+
+import type {
+  DownloadArtifactDescriptor,
+  DownloadExportPayload,
+  StartedDownload,
+} from "@/src/features/export/download-types";
 
 export default defineBackground(() => {
   const imageConverter = new BrowserImageConverter();
@@ -80,6 +91,27 @@ export default defineBackground(() => {
 
               log: "",
             });
+          });
+
+        return true;
+      }
+
+      if (isDownloadExportRequest(message)) {
+        void downloadExport(message.payload)
+          .then(sendResponse)
+          .catch((error) => {
+            const response: ChatTexDownloadExportResponse = {
+              ok: false,
+
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Unable to download export files.",
+
+              downloads: [],
+            };
+
+            sendResponse(response);
           });
 
         return true;
@@ -157,4 +189,79 @@ async function ensureCompilerDocument(): Promise<void> {
   }
 
   await creatingOffscreenDocument;
+}
+
+async function downloadExport(
+  payload: DownloadExportPayload,
+): Promise<ChatTexDownloadExportResponse> {
+  await ensureCompilerDocument();
+
+  const request: ChatTexPrepareDownloadsOffscreenRequest = {
+    type: CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN,
+
+    payload,
+  };
+
+  const prepared = (await browser.runtime.sendMessage(
+    request,
+  )) as ChatTexPrepareDownloadsOffscreenResponse;
+
+  if (!prepared.ok) {
+    return {
+      ok: false,
+      error: prepared.error,
+      downloads: [],
+    };
+  }
+
+  const downloads: StartedDownload[] = [];
+
+  for (const artifact of prepared.artifacts) {
+    downloads.push(await startArtifactDownload(artifact));
+  }
+
+  const failed = downloads.filter((download) => download.error !== null);
+
+  if (failed.length > 0) {
+    return {
+      ok: false,
+
+      error: `${failed.length} file downloads failed.`,
+
+      downloads,
+    };
+  }
+
+  return {
+    ok: true,
+    downloads,
+  };
+}
+
+async function startArtifactDownload(
+  artifact: DownloadArtifactDescriptor,
+): Promise<StartedDownload> {
+  try {
+    const downloadId = await browser.downloads.download({
+      url: artifact.objectUrl,
+      filename: `ChatTeX/${artifact.filename}`,
+
+      saveAs: false,
+
+      conflictAction: "uniquify",
+    });
+
+    return {
+      filename: artifact.filename,
+      downloadId,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      filename: artifact.filename,
+      downloadId: null,
+
+      error: error instanceof Error ? error.message : "Download failed.",
+    };
+  }
 }

@@ -19,6 +19,12 @@ import type { PreparedExport } from "@/src/features/export/types";
 
 import type { LatexAssetRequest } from "@/src/features/latex/types";
 
+import type {
+  DownloadExportPayload,
+  DownloadExportResult,
+  PrepareDownloadResult,
+} from "@/src/features/export/download-types";
+
 export const CHAT2TEX_PING = "CHAT2TEX_PING";
 
 export interface PingMessage {
@@ -44,6 +50,11 @@ export const CHATTEX_COMPILE_LATEX = "CHATTEX_COMPILE_LATEX" as const;
 
 export const CHATTEX_COMPILE_IN_OFFSCREEN =
   "CHATTEX_COMPILE_IN_OFFSCREEN" as const;
+
+export const CHATTEX_DOWNLOAD_EXPORT = "CHATTEX_DOWNLOAD_EXPORT" as const;
+
+export const CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN =
+  "CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN" as const;
 
 export interface ChatTexPingRequest {
   type: typeof CHAT2TEX_PING;
@@ -266,5 +277,63 @@ function hasCompileProject(value: unknown): value is {
     typeof project.source === "string" &&
     "files" in project &&
     Array.isArray(project.files)
+  );
+}
+
+export interface ChatTexDownloadExportRequest {
+  type: typeof CHATTEX_DOWNLOAD_EXPORT;
+
+  payload: DownloadExportPayload;
+}
+
+export type ChatTexDownloadExportResponse = DownloadExportResult;
+
+export interface ChatTexPrepareDownloadsOffscreenRequest {
+  type: typeof CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN;
+
+  payload: DownloadExportPayload;
+}
+
+export type ChatTexPrepareDownloadsOffscreenResponse = PrepareDownloadResult;
+
+export function isDownloadExportRequest(
+  value: unknown,
+): value is ChatTexDownloadExportRequest {
+  return (
+    hasMessageType(value, CHATTEX_DOWNLOAD_EXPORT) && hasDownloadPayload(value)
+  );
+}
+
+export function isPrepareDownloadsOffscreenRequest(
+  value: unknown,
+): value is ChatTexPrepareDownloadsOffscreenRequest {
+  return (
+    hasMessageType(value, CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN) &&
+    hasDownloadPayload(value)
+  );
+}
+
+function hasDownloadPayload(value: unknown): value is {
+  payload: DownloadExportPayload;
+} {
+  if (typeof value !== "object" || value === null || !("payload" in value)) {
+    return false;
+  }
+
+  const payload = value.payload;
+
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "title" in payload &&
+    typeof payload.title === "string" &&
+    "latexSource" in payload &&
+    typeof payload.latexSource === "string" &&
+    "pdfBase64" in payload &&
+    typeof payload.pdfBase64 === "string" &&
+    "files" in payload &&
+    Array.isArray(payload.files) &&
+    "failures" in payload &&
+    Array.isArray(payload.failures)
   );
 }

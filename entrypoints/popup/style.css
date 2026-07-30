@@ -309,3 +309,14 @@ button:focus-visible {
   font-size: 12px;
   line-height: 1.4;
 }
+.download-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #657086;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.download-list li {
+  overflow-wrap: anywhere;
+}

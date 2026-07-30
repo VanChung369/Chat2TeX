@@ -223,6 +223,36 @@ export default function App() {
                     Math.floor(exportFlow.pdfBase64.length * 0.75),
                   )}
                 </p>
+
+                <button
+                  className="button button--primary"
+                  type="button"
+                  onClick={() => {
+                    void exportFlow.downloadAll();
+                  }}
+                >
+                  Download PDF + TEX + ZIP
+                </button>
+              </section>
+            )}
+            {exportFlow.phase === "packaging" && (
+              <section className="progress-card">
+                <strong>Packaging export</strong>
+
+                <p>Creating PDF, LaTeX and source ZIP...</p>
+
+                <progress />
+              </section>
+            )}
+            {exportFlow.phase === "downloaded" && (
+              <section className="export-ready">
+                <strong>Export downloaded</strong>
+
+                <ul className="download-list">
+                  {exportFlow.downloadedFiles.map((filename) => (
+                    <li key={filename}>{filename}</li>
+                  ))}
+                </ul>
               </section>
             )}
             {exportFlow.phase === "error" && exportFlow.error && (

@@ -26,6 +26,9 @@ import {
   CHATTEX_COMPILE_LATEX,
   type ChatTexCompileLatexRequest,
   type ChatTexCompileInOffscreenResponse,
+  CHATTEX_DOWNLOAD_EXPORT,
+  type ChatTexDownloadExportRequest,
+  type ChatTexDownloadExportResponse,
 } from "@/src/shared/messages";
 
 export type ExportPhase =
@@ -36,6 +39,8 @@ export type ExportPhase =
   | "ready"
   | "compiling"
   | "compiled"
+  | "packaging"
+  | "downloaded"
   | "error";
 
 export function useExportFlow() {
@@ -55,6 +60,8 @@ export function useExportFlow() {
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
 
   const [compileLog, setCompileLog] = useState("");
+
+  const [downloadedFiles, setDownloadedFiles] = useState<string[]>([]);
 
   async function prepare(): Promise<void> {
     setPhase("preparing");
@@ -219,6 +226,58 @@ export function useExportFlow() {
     }
   }
 
+  async function downloadAll(): Promise<void> {
+    if (!prepared || !processedAssets || !pdfBase64) {
+      return;
+    }
+
+    setPhase("packaging");
+    setError(null);
+    setDownloadedFiles([]);
+
+    try {
+      const request: ChatTexDownloadExportRequest = {
+        type: CHATTEX_DOWNLOAD_EXPORT,
+
+        payload: {
+          title: prepared.title,
+
+          url: prepared.url,
+
+          exportedAtIso: new Date().toISOString(),
+
+          latexSource: prepared.latexSource,
+
+          pdfBase64,
+
+          files: processedAssets.files,
+
+          failures: processedAssets.failures,
+        },
+      };
+
+      const response = (await browser.runtime.sendMessage(
+        request,
+      )) as ChatTexDownloadExportResponse;
+
+      const successfulFiles = response.downloads
+        .filter((download) => download.error === null)
+        .map((download) => download.filename);
+
+      setDownloadedFiles(successfulFiles);
+
+      if (!response.ok) {
+        throw new Error(response.error);
+      }
+
+      setPhase("downloaded");
+    } catch (caughtError) {
+      setError(readErrorMessage(caughtError));
+
+      setPhase("error");
+    }
+  }
+
   return {
     phase,
     prepared,
@@ -228,9 +287,11 @@ export function useExportFlow() {
     error,
     pdfBase64,
     compileLog,
+    downloadedFiles,
     prepare,
     grantPermissions,
     compile,
+    downloadAll,
   };
 }
 
