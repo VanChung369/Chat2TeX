@@ -88,7 +88,7 @@ export default defineContentScript({
           if (protocol === "blob:" || protocol === "data:") {
             const pageResult = await pageImageReader.read(asset);
             if (pageResult.ok) {
-              const convertResult = (await browser.runtime.sendMessage({
+              const convertResult = (await sendRuntimeMessageWithRetry({
                 type: "CHATTEX_CONVERT_IMAGE_DATA",
                 asset,
                 data: pageResult.data,
@@ -99,7 +99,7 @@ export default defineContentScript({
               }
             }
           } else {
-            const result = (await browser.runtime.sendMessage({
+            const result = (await sendRuntimeMessageWithRetry({
               type: "CHATTEX_PROCESS_IMAGE_ASSET",
               asset,
             })) as ResolveAssetResult;
@@ -123,10 +123,13 @@ export default defineContentScript({
       return { files, failures };
     };
 
-    const runInPageExport = async (updateStatus: (statusText: string) => void) => {
+    const runInPageExport = async (
+      updateStatus: (statusText: string) => void,
+      options: import("@/src/features/latex/types").LatexExportOptions,
+    ) => {
       updateStatus("1/3 Quét cuộc trò chuyện...");
       const conversation = await collectConversation();
-      const prepared = prepareConversationExport(conversation);
+      const prepared = prepareConversationExport(conversation, options);
 
       if (prepared.assets.length > 0) {
         updateStatus(`1/3 Đang xử lý ${prepared.assets.length} hình ảnh...`);
@@ -214,7 +217,10 @@ export default defineContentScript({
             .then((conversation) => {
               const response: ChatTexPrepareExportResponse = {
                 ok: true,
-                prepared: prepareConversationExport(conversation),
+                prepared: prepareConversationExport(
+                  conversation,
+                  message.options || message.templateId,
+                ),
               };
 
               sendResponse(response);
@@ -276,8 +282,8 @@ function readProtocol(value: string): string {
 
 async function sendRuntimeMessageWithRetry<T>(
   message: unknown,
-  maxRetries = 10,
-  delayMs = 300,
+  maxRetries = 30,
+  delayMs = 350,
 ): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {

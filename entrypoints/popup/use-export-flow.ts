@@ -67,7 +67,16 @@ export function useExportFlow() {
 
   const [downloadedFiles, setDownloadedFiles] = useState<string[]>([]);
 
-  async function prepare(): Promise<void> {
+  async function prepare(
+    optionsOrTemplateId?:
+      | import("@/src/features/latex/types").LatexExportOptions
+      | import("@/src/features/latex/types").LatexTemplateId,
+  ): Promise<void> {
+    const options =
+      typeof optionsOrTemplateId === "string"
+        ? { templateId: optionsOrTemplateId }
+        : optionsOrTemplateId;
+
     setPhase("preparing");
     setError(null);
     setProgress(null);
@@ -80,9 +89,11 @@ export function useExportFlow() {
 
       const request: ChatTexPrepareExportRequest = {
         type: CHATTEX_PREPARE_EXPORT,
+        options,
+        templateId: options?.templateId,
       };
 
-      const response = (await browser.tabs.sendMessage(
+      const response = (await sendTabMessageWithRetry(
         tabId,
         request,
       )) as ChatTexPrepareExportResponse;
@@ -423,4 +434,37 @@ async function mapConcurrent<T, R>(
 
   await Promise.all(workers);
   return results;
+}
+
+async function sendTabMessageWithRetry<T>(
+  tabId: number,
+  message: unknown,
+  maxRetries = 10,
+  delayMs = 300,
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+    try {
+      return (await browser.tabs.sendMessage(tabId, message)) as T;
+    } catch (error) {
+      const isNoReceiver =
+        error instanceof Error &&
+        (error.message.includes("Could not establish connection") ||
+          error.message.includes("Receiving end does not exist"));
+
+      if (isNoReceiver && attempt < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      if (isNoReceiver) {
+        throw new Error(
+          "Không thể kết nối với trang ChatGPT. Vui lòng bấm F5 (Tải lại trang ChatGPT) rồi thử lại.",
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Tốc độ phản hồi của trang ChatGPT quá chậm. Vui lòng tải lại trang.");
 }

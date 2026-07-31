@@ -241,39 +241,13 @@ describe("LatexGenerator", () => {
 
     expect(result.source).toContain("\\documentclass[11pt,a4paper]{article}");
 
-    expect(result.source).toContain(
-      [
-        "\\IfFileExists{fontspec.sty}{",
-        "  \\usepackage{fontspec}",
-        "  \\setmainfont{Latin Modern Roman}",
-        "  \\setsansfont{Latin Modern Sans}",
-        "  \\setmonofont{Latin Modern Mono}",
-        "}{}",
-      ].join("\n"),
-    );
+    expect(result.source).toContain("\\usepackage{iftex}");
+    expect(result.source).toContain("\\usepackage{fontspec}");
 
-    expect(result.source).toContain("\\definecolor{bookpaper}{HTML}{FFFDF8}");
-    expect(result.source).toContain("\\pagecolor{bookpaper}");
     expect(result.source).toContain("\\newenvironment{readerquestion}");
-    expect(result.source).toContain("\\def\\ps@chatbook");
-    expect(result.source).toContain("\\begin{titlepage}");
-    expect(result.source).toContain(
-      "{\\sffamily\\small\\bfseries\\MakeUppercase{Chat2TeX Edition}}",
-    );
-    expect(result.source).toContain(
-      "{\\Huge\\bfseries Binary Search \\& Complexity\\par}",
-    );
-    expect(result.source).toContain("\\pagenumbering{roman}");
-    expect(result.source).toContain("\\tableofcontents");
-    expect(result.source).toContain("\\pagenumbering{arabic}");
-    expect(result.source).toContain(
-      "\\setchatbooktitle{Binary Search \\& Complexity}",
-    );
-    expect(result.source).toContain("\\pagestyle{chatbook}");
+    expect(result.source).toContain("\\maketitle");
     expect(result.source).toContain("\\begin{document}");
     expect(result.source).toContain("\\end{document}");
-    expect(result.source).not.toContain("\\maketitle");
-    expect(result.source).not.toContain("\\chatmessageheader");
     expect(result.source).toContain("\\IfFileExists{assets/image-001.png}");
   });
 
@@ -287,8 +261,6 @@ describe("LatexGenerator", () => {
     expect(result.source).not.toContain("\\begin{chatmessage}");
     expect(result.source).not.toContain("\\begin{minipage}");
     expect(result.source).toContain("\\begin{readerquestion}");
-    expect(result.source).toContain("\\begingroup");
-    expect(result.source).toContain("\\par\\endgroup\\bigskip");
   });
 
   it("renders user prompts as sections and assistant headings as children", () => {
@@ -560,18 +532,7 @@ describe("LatexGenerator", () => {
       createCodeDocument("typescript", "const value: number = 1;"),
     ).source;
 
-    expect(source).toContain(
-      [
-        "\\IfFileExists{accsupp.sty}{",
-        "  \\usepackage{accsupp}",
-        "  \\newcommand{\\chatcodenumber}[1]{%",
-        "    \\BeginAccSupp{method=escape,ActualText={}}##1\\EndAccSupp{}%",
-        "  }",
-        "}{",
-        "  \\newcommand{\\chatcodenumber}[1]{##1}",
-        "}",
-      ].join("\n"),
-    );
+    expect(source).toContain("\\providecommand{\\chatcodenumber}[1]{#1}");
   });
 
   it("infers TypeScript only from strong unlabeled syntax", () => {
@@ -607,14 +568,14 @@ describe("LatexGenerator", () => {
   it("renders editorial code, lists, tables and math", () => {
     const generator = new LatexGenerator();
 
-    const result = generator.generate(createDocument());
+    const result = generator.generate(createDocument(), "editorial-book");
 
-    expect(result.source).toContain("\\definecolor{codebackground}{HTML}{F3F1ED}");
-    expect(result.source).toContain("\\definecolor{codeforeground}{HTML}{25282E}");
-    expect(result.source).toContain("\\definecolor{codekeyword}{HTML}{1F5FAE}");
-    expect(result.source).toContain("\\definecolor{codestring}{HTML}{A13D52}");
-    expect(result.source).toContain("\\definecolor{codecomment}{HTML}{397052}");
-    expect(result.source).toContain("\\definecolor{codelabel}{HTML}{8A5A3B}");
+    expect(result.source).toContain("\\definecolor{codebackground}{HTML}{F7FAFC}");
+    expect(result.source).toContain("\\definecolor{codeforeground}{HTML}{1A202C}");
+    expect(result.source).toContain("\\definecolor{codekeyword}{HTML}{3182CE}");
+    expect(result.source).toContain("\\definecolor{codestring}{HTML}{DD6B20}");
+    expect(result.source).toContain("\\definecolor{codecomment}{HTML}{38A169}");
+    expect(result.source).toContain("\\definecolor{codelabel}{HTML}{2B6CB0}");
     expect(result.source).toContain(
       "{\\sffamily\\scriptsize\\bfseries\\color{codelabel}\\MakeUppercase{TypeScript}\\par}",
     );
@@ -630,18 +591,9 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain(
       "identifierstyle=\\color{codeforeground}",
     );
-    expect(result.source).toContain("\\IfFileExists{accsupp.sty}{");
-    expect(result.source).toContain("\\usepackage{accsupp}");
-    expect(result.source).toContain(
-      "\\newcommand{\\chatcodenumber}[1]",
-    );
-    expect(result.source).toContain(
-      "\\BeginAccSupp{method=escape,ActualText={}}##1\\EndAccSupp{}",
-    );
-    expect(result.source).toContain(
-      "numberstyle=\\scriptsize\\color{bookmuted}\\chatcodenumber",
-    );
-    expect(result.source).toContain("\\lstset{numbers=none}");
+    expect(result.source).toContain("\\providecommand{\\chatcodenumber}[1]{#1}");
+    expect(result.source).toContain("numberstyle=\\scriptsize\\color{bookmuted}");
+    expect(result.source).toContain("numbers=left");
     expect(result.source).not.toContain("title={JavaScript}");
 
     expect(result.source).toContain("\\begin{enumerate}[start=2]");
@@ -805,5 +757,43 @@ describe("LatexGenerator", () => {
 
     const result = generator.generate(doc);
     expect(result.source).toContain("console.log('Done! [🚀][👍]');");
+  });
+
+  it("supports all 10 LaTeX document templates with distinct preambles", () => {
+    const generator = new LatexGenerator();
+    const doc = createDocument();
+
+    const academic = generator.generate(doc, "academic").source;
+    expect(academic).toContain("\\definecolor{bookpaper}{HTML}{FFFFFF}");
+
+    const dark = generator.generate(doc, "dark-mode").source;
+    expect(dark).toContain("\\definecolor{bookpaper}{HTML}{18181B}");
+
+    const ieee = generator.generate(doc, "ieee-twocolumn").source;
+    expect(ieee).toContain("twocolumn");
+    expect(ieee).toContain("\\begin{tabular}");
+    expect(ieee).not.toContain("\\begin{longtable}");
+
+    const notion = generator.generate(doc, "notion-style").source;
+    expect(notion).toContain("\\definecolor{bookaccent}{HTML}{6366F1}");
+
+    const exec = generator.generate(doc, "executive-report").source;
+    expect(exec).toContain("\\definecolor{bookaccent}{HTML}{1E3A8A}");
+
+    const book = generator.generate(doc, "editorial-book").source;
+    expect(book).toContain("\\begin{titlepage}");
+  });
+
+  it("supports custom paper background color and font family overrides", () => {
+    const generator = new LatexGenerator();
+    const doc = createDocument();
+
+    const sepia = generator.generate(doc, { templateId: "academic", paperColor: "sepia", fontFamily: "sans" }).source;
+    expect(sepia).toContain("\\definecolor{bookpaper}{HTML}{FBF0D9}");
+    expect(sepia).toContain("\\renewcommand{\\familydefault}{\\sfdefault}");
+
+    const dark = generator.generate(doc, { templateId: "academic", paperColor: "dark", fontFamily: "mono" }).source;
+    expect(dark).toContain("\\definecolor{bookpaper}{HTML}{18181B}");
+    expect(dark).toContain("\\renewcommand{\\familydefault}{\\ttdefault}");
   });
 });

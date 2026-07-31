@@ -42,7 +42,8 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener(
     (message: unknown, sender, sendResponse) => {
       if (!isTrustedSender(sender)) {
-        return;
+        sendResponse({ ok: false, error: "Unauthorized extension message sender." });
+        return false;
       }
 
       if (isProcessImageAssetRequest(message)) {
@@ -161,8 +162,8 @@ async function compileInOffscreen(
 
 async function sendMessageToOffscreenWithRetry<T>(
   message: unknown,
-  maxRetries = 10,
-  delayMs = 250,
+  maxRetries = 30,
+  delayMs = 350,
 ): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
@@ -207,6 +208,10 @@ async function ensureCompilerDocument(): Promise<void> {
 
         justification:
           "Run the XeLaTeX WebAssembly compiler without blocking the popup.",
+      })
+      .then(async () => {
+        // Allow WASM script listener initialization time
+        await new Promise((resolve) => setTimeout(resolve, 300));
       })
       .finally(() => {
         creatingOffscreenDocument = null;

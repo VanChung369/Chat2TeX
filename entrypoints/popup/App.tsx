@@ -25,6 +25,9 @@ export default function App() {
     null,
   );
 
+  const [selectedTemplate, setSelectedTemplate] = useState<import("@/src/features/latex/types").LatexTemplateId>("academic");
+  const [selectedColor, setSelectedColor] = useState<import("@/src/features/latex/types").LatexPaperColor>("default");
+  const [selectedFont, setSelectedFont] = useState<import("@/src/features/latex/types").LatexFontFamily>("default");
   const exportFlow = useExportFlow();
 
   const compilerRejectedAssets =
@@ -118,6 +121,87 @@ export default function App() {
               </span>
             </div>
 
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "10px 0" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "11px", fontWeight: 600, color: "#718096" }}>
+                  1. LaTeX Template (10 Options):
+                </label>
+                <select
+                  value={selectedTemplate}
+                  onChange={(e) => setSelectedTemplate(e.target.value as import("@/src/features/latex/types").LatexTemplateId)}
+                  style={{
+                    padding: "6px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e0",
+                    fontSize: "12px",
+                    backgroundColor: "#fff",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="academic">🎓 Academic Article (Báo cáo khoa học)</option>
+                  <option value="editorial-book">📚 Editorial Book (Sách bìa trang trọng)</option>
+                  <option value="modern-minimal">✨ Modern Minimalist (Tối giản hiện đại)</option>
+                  <option value="executive-report">💼 Executive Report (Doanh nghiệp Navy)</option>
+                  <option value="ieee-twocolumn">📑 IEEE Two-Column (2 Cột IEEE)</option>
+                  <option value="notion-style">📝 Notion Notes (Ghi chú Notion)</option>
+                  <option value="cheatsheet">⚡ Compact Cheatsheet (Tra cứu nhanh)</option>
+                  <option value="dark-mode">🌙 Sleek Dark Mode (Nền tối chữ sáng)</option>
+                  <option value="classic-serif">📖 Classic Monograph (Sách cổ điển)</option>
+                  <option value="typewriter-memo">📠 Technical Memo (Ghi nhớ kỹ thuật)</option>
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: 600, color: "#718096" }}>
+                    2. Màu Nền Giấy:
+                  </label>
+                  <select
+                    value={selectedColor}
+                    onChange={(e) => setSelectedColor(e.target.value as import("@/src/features/latex/types").LatexPaperColor)}
+                    style={{
+                      padding: "6px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e0",
+                      fontSize: "11px",
+                      backgroundColor: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="default">✨ Theo Mẫu</option>
+                    <option value="white">⚪ Trắng Tinh</option>
+                    <option value="cream">📜 Kem Ngà</option>
+                    <option value="sepia">📔 Vàng Sepia</option>
+                    <option value="grey">🩶 Xám Nhạt</option>
+                    <option value="dark">🌙 Nền Tối</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: 600, color: "#718096" }}>
+                    3. Font Chữ:
+                  </label>
+                  <select
+                    value={selectedFont}
+                    onChange={(e) => setSelectedFont(e.target.value as import("@/src/features/latex/types").LatexFontFamily)}
+                    style={{
+                      padding: "6px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e0",
+                      fontSize: "11px",
+                      backgroundColor: "#fff",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="default">✨ Theo Mẫu</option>
+                    <option value="serif">📖 Serif</option>
+                    <option value="sans">✨ Sans-Serif</option>
+                    <option value="mono">📠 Monospace</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <button
               className="button button--primary"
               type="button"
@@ -126,7 +210,11 @@ export default function App() {
                 exportFlow.phase === "processing-assets"
               }
               onClick={() => {
-                void exportFlow.prepare();
+                void exportFlow.prepare({
+                  templateId: selectedTemplate,
+                  paperColor: selectedColor,
+                  fontFamily: selectedFont,
+                });
               }}
             >
               {exportFlow.phase === "preparing"

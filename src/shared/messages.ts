@@ -17,7 +17,11 @@ import type {
 
 import type { PreparedExport } from "@/src/features/export/types";
 
-import type { LatexAssetRequest } from "@/src/features/latex/types";
+import type {
+  LatexAssetRequest,
+  LatexExportOptions,
+  LatexTemplateId,
+} from "@/src/features/latex/types";
 
 import type {
   DownloadExportPayload,
@@ -160,6 +164,8 @@ export function isProcessImageAssetRequest(
 
 export interface ChatTexPrepareExportRequest {
   type: typeof CHATTEX_PREPARE_EXPORT;
+  options?: LatexExportOptions;
+  templateId?: LatexTemplateId;
 }
 
 export type ChatTexPrepareExportResponse =

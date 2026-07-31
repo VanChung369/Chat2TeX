@@ -15,12 +15,20 @@ import {
   sanitizeCodeBlockUnicode,
 } from "./latex-escape";
 
-import type { LatexAssetRequest, LatexGenerationResult } from "./types";
+import type {
+  LatexAssetRequest,
+  LatexExportOptions,
+  LatexFontFamily,
+  LatexGenerationResult,
+  LatexPaperColor,
+  LatexTemplateId,
+} from "./types";
 
 interface BlockRenderContext {
   numberedHeadings: boolean;
   headingBaseLevel: number;
   headingLevelOffset: 0 | 1;
+  isTwoColumn?: boolean;
 }
 
 type DocumentLanguage = "en" | "vi";
@@ -59,7 +67,19 @@ const BOOK_LABELS: Readonly<Record<DocumentLanguage, BookLabels>> = {
 export class LatexGenerator {
   private assets: LatexAssetRequest[] = [];
 
-  generate(document: ChatDocumentAst): LatexGenerationResult {
+  generate(
+    document: ChatDocumentAst,
+    optionsOrTemplateId: LatexExportOptions | LatexTemplateId = "academic",
+  ): LatexGenerationResult {
+    const options: LatexExportOptions =
+      typeof optionsOrTemplateId === "string"
+        ? { templateId: optionsOrTemplateId }
+        : optionsOrTemplateId;
+
+    const templateId = options.templateId ?? "academic";
+    const paperColor = options.paperColor ?? "default";
+    const fontFamily = options.fontFamily ?? "default";
+
     this.assets = [];
 
     const language = detectDocumentLanguage(document);
@@ -84,18 +104,34 @@ export class LatexGenerator {
           language,
           labels,
           questionNumber,
+          templateId,
         );
       })
       .join("\n\n");
 
+    const isBookStyle =
+      templateId === "editorial-book" || templateId === "classic-serif";
+
+    const headerContent = isBookStyle
+      ? [
+          this.renderCover(document, labels),
+          "",
+          this.renderContents(document),
+        ].join("\n")
+      : this.renderAcademicHeader(document, labels);
+
     const source = [
-      this.renderPreamble(language, labels),
+      this.renderPreamble(
+        language,
+        labels,
+        templateId,
+        paperColor,
+        fontFamily,
+      ),
       "",
       "\\begin{document}",
       "",
-      this.renderCover(document, labels),
-      "",
-      this.renderContents(document),
+      headerContent,
       "",
       body,
       "",
@@ -112,11 +148,184 @@ export class LatexGenerator {
   private renderPreamble(
     language: DocumentLanguage,
     labels: BookLabels,
+    templateId: LatexTemplateId,
+    paperColor: LatexPaperColor = "default",
+    fontFamily: LatexFontFamily = "default",
   ): string {
+    const docClass =
+      templateId === "ieee-twocolumn"
+        ? "\\documentclass[10pt,twocolumn,a4paper]{article}"
+        : templateId === "cheatsheet"
+          ? "\\documentclass[9pt,twocolumn,a4paper]{article}"
+          : "\\documentclass[11pt,a4paper]{article}";
+
+    const geometry =
+      templateId === "cheatsheet"
+        ? "\\geometry{top=12mm, bottom=12mm, left=12mm, right=12mm}"
+        : templateId === "ieee-twocolumn"
+          ? "\\geometry{top=18mm, bottom=18mm, left=15mm, right=15mm}"
+          : "\\geometry{top=22mm, bottom=22mm, left=22mm, right=22mm, headheight=20pt}";
+
+    const fontOverrides =
+      fontFamily === "sans"
+        ? ["\\renewcommand{\\familydefault}{\\sfdefault}"]
+        : fontFamily === "serif"
+          ? ["\\renewcommand{\\familydefault}{\\rmdefault}"]
+          : fontFamily === "mono"
+            ? ["\\renewcommand{\\familydefault}{\\ttdefault}"]
+            : [];
+
+    const isDark = paperColor === "dark" || (paperColor === "default" && templateId === "dark-mode");
+
+    const colors = isDark
+      ? [
+          "\\definecolor{bookpaper}{HTML}{18181B}",
+          "\\definecolor{bookink}{HTML}{F4F4F5}",
+          "\\definecolor{bookmuted}{HTML}{A1A1AA}",
+          "\\definecolor{bookaccent}{HTML}{38BDF8}",
+          "\\definecolor{bookrule}{HTML}{3F3F46}",
+          "\\definecolor{questionaccent}{HTML}{38BDF8}",
+          "\\definecolor{questionbg}{HTML}{27272A}",
+          "\\definecolor{questiontext}{HTML}{38BDF8}",
+          "\\definecolor{codebackground}{HTML}{27272A}",
+          "\\definecolor{codeforeground}{HTML}{F4F4F5}",
+          "\\definecolor{codecomment}{HTML}{4ADE80}",
+          "\\definecolor{codekeyword}{HTML}{38BDF8}",
+          "\\definecolor{codestring}{HTML}{FACC15}",
+          "\\definecolor{codelabel}{HTML}{38BDF8}",
+          "\\definecolor{coderule}{HTML}{3F3F46}",
+        ]
+      : paperColor === "sepia"
+        ? [
+            "\\definecolor{bookpaper}{HTML}{FBF0D9}",
+            "\\definecolor{bookink}{HTML}{2C221E}",
+            "\\definecolor{bookmuted}{HTML}{8B7355}",
+            "\\definecolor{bookaccent}{HTML}{8B4513}",
+            "\\definecolor{bookrule}{HTML}{E7DFD5}",
+            "\\definecolor{questionaccent}{HTML}{8B4513}",
+            "\\definecolor{questionbg}{HTML}{F5EFE6}",
+            "\\definecolor{questiontext}{HTML}{2C221E}",
+            "\\definecolor{codebackground}{HTML}{F9F6F0}",
+            "\\definecolor{codeforeground}{HTML}{2C221E}",
+            "\\definecolor{codecomment}{HTML}{6B8E23}",
+            "\\definecolor{codekeyword}{HTML}{8B4513}",
+            "\\definecolor{codestring}{HTML}{CD853F}",
+            "\\definecolor{codelabel}{HTML}{8B4513}",
+            "\\definecolor{coderule}{HTML}{E7DFD5}",
+          ]
+        : paperColor === "white"
+          ? [
+              "\\definecolor{bookpaper}{HTML}{FFFFFF}",
+              "\\definecolor{bookink}{HTML}{111111}",
+              "\\definecolor{bookmuted}{HTML}{555555}",
+              "\\definecolor{bookaccent}{HTML}{2B6CB0}",
+              "\\definecolor{bookrule}{HTML}{CCCCCC}",
+              "\\definecolor{questionaccent}{HTML}{2B6CB0}",
+              "\\definecolor{questionbg}{HTML}{F8F9FA}",
+              "\\definecolor{questiontext}{HTML}{111111}",
+              "\\definecolor{codebackground}{HTML}{F8F9FA}",
+              "\\definecolor{codeforeground}{HTML}{111111}",
+              "\\definecolor{codecomment}{HTML}{008000}",
+              "\\definecolor{codekeyword}{HTML}{0000FF}",
+              "\\definecolor{codestring}{HTML}{A31515}",
+              "\\definecolor{codelabel}{HTML}{2B6CB0}",
+              "\\definecolor{coderule}{HTML}{CCCCCC}",
+            ]
+          : paperColor === "cream"
+            ? [
+                "\\definecolor{bookpaper}{HTML}{FCFBF9}",
+                "\\definecolor{bookink}{HTML}{1A202C}",
+                "\\definecolor{bookmuted}{HTML}{718096}",
+                "\\definecolor{bookaccent}{HTML}{2B6CB0}",
+                "\\definecolor{bookrule}{HTML}{E2E8F0}",
+                "\\definecolor{questionaccent}{HTML}{15803D}",
+                "\\definecolor{questionbg}{HTML}{F0FDF4}",
+                "\\definecolor{questiontext}{HTML}{166534}",
+                "\\definecolor{codebackground}{HTML}{F7FAFC}",
+                "\\definecolor{codeforeground}{HTML}{1A202C}",
+                "\\definecolor{codecomment}{HTML}{38A169}",
+                "\\definecolor{codekeyword}{HTML}{3182CE}",
+                "\\definecolor{codestring}{HTML}{DD6B20}",
+                "\\definecolor{codelabel}{HTML}{2B6CB0}",
+                "\\definecolor{coderule}{HTML}{CBD5E0}",
+              ]
+            : templateId === "notion-style"
+              ? [
+                  "\\definecolor{bookpaper}{HTML}{FAFAFA}",
+                  "\\definecolor{bookink}{HTML}{18181B}",
+                  "\\definecolor{bookmuted}{HTML}{71717A}",
+                  "\\definecolor{bookaccent}{HTML}{6366F1}",
+                  "\\definecolor{bookrule}{HTML}{E4E4E7}",
+                  "\\definecolor{questionaccent}{HTML}{6366F1}",
+                  "\\definecolor{questionbg}{HTML}{EEF2FF}",
+                  "\\definecolor{questiontext}{HTML}{4338CA}",
+                  "\\definecolor{codebackground}{HTML}{F4F4F5}",
+                  "\\definecolor{codeforeground}{HTML}{18181B}",
+                  "\\definecolor{codecomment}{HTML}{10B981}",
+                  "\\definecolor{codekeyword}{HTML}{6366F1}",
+                  "\\definecolor{codestring}{HTML}{F59E0B}",
+                  "\\definecolor{codelabel}{HTML}{6366F1}",
+                  "\\definecolor{coderule}{HTML}{E4E4E7}",
+                ]
+              : templateId === "executive-report"
+                ? [
+                    "\\definecolor{bookpaper}{HTML}{FFFFFF}",
+                    "\\definecolor{bookink}{HTML}{0F172A}",
+                    "\\definecolor{bookmuted}{HTML}{64748B}",
+                    "\\definecolor{bookaccent}{HTML}{1E3A8A}",
+                    "\\definecolor{bookrule}{HTML}{CBD5E1}",
+                    "\\definecolor{questionaccent}{HTML}{1E3A8A}",
+                    "\\definecolor{questionbg}{HTML}{F1F5F9}",
+                    "\\definecolor{questiontext}{HTML}{1E3A8A}",
+                    "\\definecolor{codebackground}{HTML}{F8FAFC}",
+                    "\\definecolor{codeforeground}{HTML}{0F172A}",
+                    "\\definecolor{codecomment}{HTML}{059669}",
+                    "\\definecolor{codekeyword}{HTML}{1D4ED8}",
+                    "\\definecolor{codestring}{HTML}{D97706}",
+                    "\\definecolor{codelabel}{HTML}{1E3A8A}",
+                    "\\definecolor{coderule}{HTML}{CBD5E1}",
+                  ]
+                : templateId === "academic" || templateId === "ieee-twocolumn"
+                  ? [
+                      "\\definecolor{bookpaper}{HTML}{FFFFFF}",
+                      "\\definecolor{bookink}{HTML}{111111}",
+                      "\\definecolor{bookmuted}{HTML}{555555}",
+                      "\\definecolor{bookaccent}{HTML}{000000}",
+                      "\\definecolor{bookrule}{HTML}{CCCCCC}",
+                      "\\definecolor{questionaccent}{HTML}{333333}",
+                      "\\definecolor{questionbg}{HTML}{FAFAFA}",
+                      "\\definecolor{questiontext}{HTML}{111111}",
+                      "\\definecolor{codebackground}{HTML}{F8F9FA}",
+                      "\\definecolor{codeforeground}{HTML}{111111}",
+                      "\\definecolor{codecomment}{HTML}{008000}",
+                      "\\definecolor{codekeyword}{HTML}{0000FF}",
+                      "\\definecolor{codestring}{HTML}{A31515}",
+                      "\\definecolor{codelabel}{HTML}{333333}",
+                      "\\definecolor{coderule}{HTML}{CCCCCC}",
+                    ]
+                  : [
+                      "\\definecolor{bookpaper}{HTML}{FCFBF9}",
+                      "\\definecolor{bookink}{HTML}{1A202C}",
+                      "\\definecolor{bookmuted}{HTML}{718096}",
+                      "\\definecolor{bookaccent}{HTML}{2B6CB0}",
+                      "\\definecolor{bookrule}{HTML}{E2E8F0}",
+                      "\\definecolor{questionaccent}{HTML}{15803D}",
+                      "\\definecolor{questionbg}{HTML}{F0FDF4}",
+                      "\\definecolor{questiontext}{HTML}{166534}",
+                      "\\definecolor{codebackground}{HTML}{F7FAFC}",
+                      "\\definecolor{codeforeground}{HTML}{1A202C}",
+                      "\\definecolor{codecomment}{HTML}{38A169}",
+                      "\\definecolor{codekeyword}{HTML}{3182CE}",
+                      "\\definecolor{codestring}{HTML}{DD6B20}",
+                      "\\definecolor{codelabel}{HTML}{2B6CB0}",
+                      "\\definecolor{coderule}{HTML}{CBD5E0}",
+                    ];
+
     return [
-      "\\documentclass[11pt,a4paper]{article}",
+      docClass,
       "",
       ...this.renderFontConfiguration(language),
+      ...fontOverrides,
       "\\usepackage{amsmath}",
       "\\usepackage{amssymb}",
       "\\usepackage{graphicx}",
@@ -130,30 +339,9 @@ export class LatexGenerator {
       "\\usepackage[normalem]{ulem}",
       "\\usepackage{geometry}",
       "",
-      "\\geometry{",
-      "  top=23mm,",
-      "  bottom=23mm,",
-      "  left=24mm,",
-      "  right=24mm,",
-      "  headheight=22pt,",
-      "  headsep=6mm,",
-      "  footskip=10mm",
-      "}",
+      geometry,
       "",
-      "\\definecolor{bookpaper}{HTML}{FFFDF8}",
-      "\\definecolor{bookink}{HTML}{332E2A}",
-      "\\definecolor{bookmuted}{HTML}{81766B}",
-      "\\definecolor{bookaccent}{HTML}{A86B3F}",
-      "\\definecolor{bookrule}{HTML}{DED5CA}",
-      "\\definecolor{questionaccent}{HTML}{6E8B75}",
-      "\\definecolor{questiontext}{HTML}{33483A}",
-      "\\definecolor{codebackground}{HTML}{F3F1ED}",
-      "\\definecolor{codeforeground}{HTML}{25282E}",
-      "\\definecolor{codecomment}{HTML}{397052}",
-      "\\definecolor{codekeyword}{HTML}{1F5FAE}",
-      "\\definecolor{codestring}{HTML}{A13D52}",
-      "\\definecolor{codelabel}{HTML}{8A5A3B}",
-      "\\definecolor{coderule}{HTML}{D8D1C7}",
+      ...colors,
       "",
       "\\hypersetup{",
       "  colorlinks=true,",
@@ -181,17 +369,18 @@ export class LatexGenerator {
       "\\setlist{itemsep=0.25em, topsep=0.45em, parsep=0pt}",
       "",
       "\\newenvironment{readerquestion}[1]{",
-      "  \\par\\bigskip",
-      "  \\begingroup",
-      "  \\setlength{\\leftskip}{1.3em}",
-      "  \\setlength{\\rightskip}{0.6em}",
-      "  \\noindent\\textcolor{questionaccent}{\\rule{22mm}{1.2pt}}",
-      "  \\par\\smallskip",
-      "  {\\sffamily\\scriptsize\\bfseries\\color{questionaccent}\\MakeUppercase{#1}}",
-      "  \\par\\smallskip",
-      "  \\sffamily\\color{questiontext}",
+      "  \\par\\vspace{1em}",
+      "  \\noindent",
+      "  \\fcolorbox{questionaccent}{questionbg}{",
+      "    \\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule\\relax}{",
+      "      \\vspace{0.2em}",
+      "      {\\sffamily\\small\\bfseries\\color{questionaccent} #1}",
+      "      \\vspace{0.4em}\\hrule height 0.4pt\\vspace{0.5em}",
+      "      \\sffamily\\color{questiontext}",
+      "    }",
+      "  }",
+      "  \\par\\vspace{1.2em}",
       "}{",
-      "  \\par\\endgroup\\bigskip",
       "}",
       "",
       "\\newenvironment{chattexiconrow}{%",
@@ -242,14 +431,7 @@ export class LatexGenerator {
       "  {\\normalfont\\sffamily\\normalsize\\bfseries\\color{bookaccent}}}",
       "\\makeatother",
       "",
-      "\\IfFileExists{accsupp.sty}{",
-      "  \\usepackage{accsupp}",
-      "  \\newcommand{\\chatcodenumber}[1]{%",
-      "    \\BeginAccSupp{method=escape,ActualText={}}##1\\EndAccSupp{}%",
-      "  }",
-      "}{",
-      "  \\newcommand{\\chatcodenumber}[1]{##1}",
-      "}",
+      "\\providecommand{\\chatcodenumber}[1]{#1}",
       "",
       "\\lstdefinelanguage{ChatJavaScript}{",
       "  sensitive=true,",
@@ -312,20 +494,17 @@ export class LatexGenerator {
       "  belowskip=0.9em",
       "}",
       "",
-      "\\IfFileExists{accsupp.sty}{",
-      "  \\lstset{",
-      "    numbers=left,",
-      "    numberstyle=\\scriptsize\\color{bookmuted}\\chatcodenumber",
-      "  }",
-      "}{",
-      "  \\lstset{numbers=none}",
+      "\\lstset{",
+      "  numbers=left,",
+      "  numberstyle=\\scriptsize\\color{bookmuted}",
       "}",
     ].join("\n");
   }
 
   private renderFontConfiguration(language: DocumentLanguage): string[] {
     return [
-      "\\IfFileExists{fontspec.sty}{",
+      "\\usepackage{iftex}",
+      "\\ifXeTeX",
       "  \\usepackage{fontspec}",
       "  \\setmainfont{Latin Modern Roman}",
       "  \\setsansfont{Latin Modern Sans}",
@@ -338,8 +517,52 @@ export class LatexGenerator {
             "  }{}",
           ]
         : []),
-      "}{}",
+      "\\else\\ifLuaTeX",
+      "  \\usepackage{fontspec}",
+      "  \\setmainfont{Latin Modern Roman}",
+      "  \\setsansfont{Latin Modern Sans}",
+      "  \\setmonofont{Latin Modern Mono}",
+      ...(language === "vi"
+        ? [
+            "  \\IfFileExists{polyglossia.sty}{",
+            "    \\usepackage{polyglossia}",
+            "    \\setdefaultlanguage{vietnamese}",
+            "  }{}",
+          ]
+        : []),
+      "\\else",
+      "  \\usepackage[utf8]{inputenc}",
+      "  \\usepackage[T1]{fontenc}",
+      "  \\usepackage{lmodern}",
+      ...(language === "vi"
+        ? ["  \\IfFileExists{vietnam.sty}{\\usepackage{vietnam}}{}"]
+        : []),
+      "\\fi\\fi",
     ];
+  }
+
+  private renderAcademicHeader(
+    document: ChatDocumentAst,
+    labels: BookLabels,
+  ): string {
+    const title = escapeNormalizedText(
+      document.title || "Untitled conversation",
+    );
+    const sourceUrl = escapeLatexUrl(document.url);
+
+    return [
+      `\\title{\\Large\\bfseries ${title}}`,
+      `\\author{\\small ${escapeNormalizedText(labels.attribution)}}`,
+      "\\date{\\small \\today}",
+      "\\maketitle",
+      "\\thispagestyle{plain}",
+      "\\vspace{-1em}",
+      "{\\centerline{\\footnotesize\\color{bookmuted}" +
+        `${escapeNormalizedText(labels.source)}: \\url{${sourceUrl}}}}`,
+      "\\vspace{1.5em}",
+      "\\hrule",
+      "\\vspace{1.5em}",
+    ].join("\n");
   }
 
   private renderCover(
@@ -441,11 +664,16 @@ export class LatexGenerator {
     language: DocumentLanguage,
     labels: BookLabels,
     questionNumber: number,
+    templateId: LatexTemplateId,
   ): string {
+    const isTwoColumn =
+      templateId === "ieee-twocolumn" || templateId === "cheatsheet";
+
     const context: BlockRenderContext = {
       numberedHeadings: message.role === "assistant",
       headingBaseLevel,
       headingLevelOffset,
+      isTwoColumn,
     };
 
     const content = this.renderBlocks(message.blocks, context);
@@ -588,7 +816,7 @@ export class LatexGenerator {
         ].join("\n");
 
       case "table":
-        return this.renderTable(block);
+        return this.renderTable(block, context);
 
       case "math":
         return ["\\[", block.latex.trim(), "\\]"].join("\n");
@@ -778,7 +1006,7 @@ export class LatexGenerator {
     ].join("\n");
   }
 
-  private renderTable(block: TableBlock): string {
+  private renderTable(block: TableBlock, context?: BlockRenderContext): string {
     if (block.rows.length === 0) {
       return "";
     }
@@ -787,12 +1015,6 @@ export class LatexGenerator {
       ...block.rows.map((row) => row.cells.length),
       1,
     );
-
-    const columnWidth =
-      `p{\\dimexpr(\\linewidth-${columnCount * 2}\\tabcolsep)` +
-      `/${columnCount}\\relax}`;
-
-    const columnDefinition = columnWidth.repeat(columnCount);
 
     const renderedRows = block.rows.map((row) => {
       const cells = Array.from({ length: columnCount }, (_, columnIndex) => {
@@ -819,6 +1041,28 @@ export class LatexGenerator {
     const header = hasHeader ? renderedRows[0] : null;
 
     const bodyRows = hasHeader ? renderedRows.slice(1) : renderedRows;
+
+    if (context?.isTwoColumn) {
+      const colSpec = "l".repeat(columnCount);
+      return [
+        "\\begin{center}",
+        "\\begin{adjustbox}{max width=\\linewidth}",
+        `\\begin{tabular}{${colSpec}}`,
+        "\\toprule",
+        ...(header ? [header, "\\midrule"] : []),
+        ...bodyRows,
+        "\\bottomrule",
+        "\\end{tabular}",
+        "\\end{adjustbox}",
+        "\\end{center}",
+      ].join("\n");
+    }
+
+    const columnWidth =
+      `p{\\dimexpr(\\linewidth-${columnCount * 2}\\tabcolsep)` +
+      `/${columnCount}\\relax}`;
+
+    const columnDefinition = columnWidth.repeat(columnCount);
 
     return [
       `\\begin{longtable}{${columnDefinition}}`,
