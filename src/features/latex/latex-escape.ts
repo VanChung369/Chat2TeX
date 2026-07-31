@@ -50,5 +50,13 @@ const EMOJI_AND_SYMBOL_PATTERN =
 export function sanitizeCodeBlockUnicode(value: string): string {
   return value
     .normalize("NFC")
-    .replace(EMOJI_AND_SYMBOL_PATTERN, (match) => `[${match}]`);
+    .replace(EMOJI_AND_SYMBOL_PATTERN, (match) => {
+      const codePoint = match.codePointAt(0);
+
+      // Latin Modern Mono lacks emoji glyphs; show the codepoint instead of a
+      // missing-glyph box that also triggers XeLaTeX "Missing character" noise.
+      return codePoint === undefined
+        ? ""
+        : `[U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}]`;
+    });
 }

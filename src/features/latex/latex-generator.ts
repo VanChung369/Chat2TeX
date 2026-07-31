@@ -466,7 +466,7 @@ export class LatexGenerator {
       "",
       "\\providecommand{\\chatcodenumber}[1]{#1}",
       "\\newlength{\\maxwidth}\\setlength{\\maxwidth}{\\linewidth}",
-      "\\newlength{\\maxheight}\\setlength{\\maxheight}{0.68\\textheight}",
+      "\\newlength{\\maxheight}\\setlength{\\maxheight}{0.55\\textheight}",
       "",
       "\\lstdefinelanguage{ChatJavaScript}{",
       "  sensitive=true,",

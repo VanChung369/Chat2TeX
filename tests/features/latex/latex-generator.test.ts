@@ -760,7 +760,9 @@ describe("LatexGenerator", () => {
     };
 
     const result = generator.generate(doc);
-    expect(result.source).toContain("console.log('Done! [🚀][👍]');");
+    expect(result.source).toContain(
+      "console.log('Done! [U+1F680][U+1F44D]');",
+    );
   });
 
   it("supports all 10 LaTeX document templates with distinct preambles", () => {
