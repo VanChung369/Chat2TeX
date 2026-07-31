@@ -781,4 +781,29 @@ describe("LatexGenerator", () => {
 
     expect(result.source).toContain("{assets/image-001.png}");
   });
+
+  it("sanitizes emojis in code blocks to prevent listings errors", () => {
+    const generator = new LatexGenerator();
+    const doc: ChatDocumentAst = {
+      title: "Emoji Test",
+      url: "https://chatgpt.com/c/emoji",
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          order: 0,
+          blocks: [
+            {
+              type: "code",
+              language: "javascript",
+              code: "console.log('Done! 🚀👍');",
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = generator.generate(doc);
+    expect(result.source).toContain("console.log('Done! [🚀][👍]');");
+  });
 });

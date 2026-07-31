@@ -12,6 +12,7 @@ import {
   escapeLatexText,
   escapeLatexUrl,
   renderInlineCode,
+  sanitizeCodeBlockUnicode,
 } from "./latex-escape";
 
 import type { LatexAssetRequest, LatexGenerationResult } from "./types";
@@ -735,9 +736,11 @@ export class LatexGenerator {
         )}}\\par}`
       : "";
 
-    const safeCode = code
-      .normalize("NFC")
-      .replace(/\\end\{lstlisting\}/g, "\\end {lstlisting}");
+    const safeCode = sanitizeCodeBlockUnicode(
+      code
+        .normalize("NFC")
+        .replace(/\\end\{lstlisting\}/g, "\\end {lstlisting}"),
+    );
 
     return [
       languageLabel,

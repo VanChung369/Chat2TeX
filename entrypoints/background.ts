@@ -156,9 +156,33 @@ async function compileInOffscreen(
     project,
   };
 
-  return browser.runtime.sendMessage(
-    request,
-  ) as Promise<ChatTexCompileInOffscreenResponse>;
+  return sendMessageToOffscreenWithRetry<ChatTexCompileInOffscreenResponse>(request);
+}
+
+async function sendMessageToOffscreenWithRetry<T>(
+  message: unknown,
+  maxRetries = 10,
+  delayMs = 250,
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+    try {
+      return (await browser.runtime.sendMessage(message)) as T;
+    } catch (error) {
+      const isNoReceiver =
+        error instanceof Error &&
+        (error.message.includes("Could not establish connection") ||
+          error.message.includes("Receiving end does not exist"));
+
+      if (isNoReceiver && attempt < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Offscreen document failed to respond.");
 }
 
 async function ensureCompilerDocument(): Promise<void> {
@@ -203,9 +227,9 @@ async function downloadExport(
     payload,
   };
 
-  const prepared = (await browser.runtime.sendMessage(
+  const prepared = await sendMessageToOffscreenWithRetry<ChatTexPrepareDownloadsOffscreenResponse>(
     request,
-  )) as ChatTexPrepareDownloadsOffscreenResponse;
+  );
 
   if (!prepared.ok) {
     return {
