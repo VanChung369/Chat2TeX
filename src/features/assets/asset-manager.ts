@@ -8,11 +8,13 @@ import type {
 export interface AssetManagerOptions {
   maximumInputBytes?: number;
   maximumImageDimension?: number;
+  requestTimeoutMs?: number;
 }
 
 const DEFAULT_OPTIONS: Required<AssetManagerOptions> = {
   maximumInputBytes: 15 * 1024 * 1024,
   maximumImageDimension: 2_400,
+  requestTimeoutMs: 30_000,
 };
 
 type AssetFetcher = (
@@ -94,6 +96,7 @@ export class AssetManager {
         credentials: "include",
         redirect: "follow",
         cache: "no-store",
+        signal: AbortSignal.timeout(this.options.requestTimeoutMs),
 
         headers: {
           Accept:
@@ -101,6 +104,14 @@ export class AssetManager {
         },
       });
     } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        return {
+          ok: false,
+          code: "download-failed",
+          message: "The image download timed out.",
+        };
+      }
+
       return {
         ok: false,
         code: "download-failed",

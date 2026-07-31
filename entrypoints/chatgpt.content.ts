@@ -29,8 +29,12 @@ import {
 
 import { InPageExporterUI } from "@/src/features/chat/in-page-exporter";
 import { truncateAtWordBoundary } from "@/src/features/latex/latex-generator";
-import type { PreparedExport, ProcessedExportAssets } from "@/src/features/export/types";
+import type {
+  PreparedExport,
+  ProcessedExportAssets,
+} from "@/src/features/export/types";
 import type { ResolveAssetResult } from "@/src/features/assets/types";
+import { debugLog } from "@/src/shared/debug";
 
 export default defineContentScript({
   matches: [
@@ -42,7 +46,7 @@ export default defineContentScript({
   runAt: "document_idle",
 
   main() {
-    console.info("[ChatTeX] Content script loaded");
+    debugLog("[ChatTeX] Content script loaded");
 
     const adapter = new ChatGPTAdapter();
 
@@ -51,13 +55,9 @@ export default defineContentScript({
     const completeConversationReader = new CompleteConversationReader(
       {
         read: () =>
-          new ChatGptConversationApiReader(
-            apiFetcher,
-            window.location.href,
-            {
-              cookie: document.cookie,
-            },
-          ).read(),
+          new ChatGptConversationApiReader(apiFetcher, window.location.href, {
+            cookie: document.cookie,
+          }).read(),
       },
       () => adapter.extractConversation(),
       () => runConversationCollection(adapter),
@@ -70,11 +70,9 @@ export default defineContentScript({
         return collectionPromise;
       }
 
-      collectionPromise = completeConversationReader
-        .read()
-        .finally(() => {
-          collectionPromise = null;
-        });
+      collectionPromise = completeConversationReader.read().finally(() => {
+        collectionPromise = null;
+      });
 
       return collectionPromise;
     };
@@ -147,7 +145,9 @@ export default defineContentScript({
       })) as { ok: boolean; pdfBase64?: string; error?: string };
 
       if (!compileResponse?.ok || !compileResponse.pdfBase64) {
-        throw new Error(compileResponse?.error || "XeLaTeX compilation failed.");
+        throw new Error(
+          compileResponse?.error || "XeLaTeX compilation failed.",
+        );
       }
 
       updateStatus("3/3 Finalizing and downloading...");
@@ -166,7 +166,9 @@ export default defineContentScript({
       })) as { ok: boolean; error?: string };
 
       if (!downloadResponse?.ok) {
-        throw new Error(downloadResponse?.error || "Download packaging failed.");
+        throw new Error(
+          downloadResponse?.error || "Download packaging failed.",
+        );
       }
 
       updateStatus(
@@ -286,7 +288,7 @@ async function runConversationCollection(
   const collector = new ConversationCollector(adapter, viewport);
 
   return collector.collect((progress) => {
-    console.info("[ChatTeX] Collecting", progress);
+    debugLog("[ChatTeX] Collecting", progress);
   });
 }
 

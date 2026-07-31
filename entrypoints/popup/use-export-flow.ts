@@ -66,7 +66,9 @@ export function useExportFlow() {
   const [compileLog, setCompileLog] = useState("");
 
   const [downloadedFiles, setDownloadedFiles] = useState<string[]>([]);
-  const [exportOptions, setExportOptions] = useState<import("@/src/features/latex/types").LatexExportOptions | null>(null);
+  const [exportOptions, setExportOptions] = useState<
+    import("@/src/features/latex/types").LatexExportOptions | null
+  >(null);
 
   async function prepare(
     optionsOrTemplateId?:
@@ -427,12 +429,15 @@ async function mapConcurrent<T, R>(
   const results: R[] = new Array(items.length);
   let currentIndex = 0;
 
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (currentIndex < items.length) {
-      const index = currentIndex++;
-      results[index] = await fn(items[index], index);
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (currentIndex < items.length) {
+        const index = currentIndex++;
+        results[index] = await fn(items[index], index);
+      }
+    },
+  );
 
   await Promise.all(workers);
   return results;
@@ -454,7 +459,9 @@ async function sendTabMessageWithRetry<T>(
           error.message.includes("Receiving end does not exist"));
 
       if (isNoReceiver && attempt < maxRetries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await new Promise((resolve) =>
+          setTimeout(resolve, backoffDelay(delayMs, attempt)),
+        );
         continue;
       }
 
@@ -468,7 +475,9 @@ async function sendTabMessageWithRetry<T>(
     }
   }
 
-  throw new Error("The ChatGPT page is responding too slowly. Please reload it.");
+  throw new Error(
+    "The ChatGPT page is responding too slowly. Please reload it.",
+  );
 }
 
 async function sendRuntimeMessageWithRetry<T>(
@@ -486,7 +495,9 @@ async function sendRuntimeMessageWithRetry<T>(
           error.message.includes("Receiving end does not exist"));
 
       if (isNoReceiver && attempt < maxRetries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await new Promise((resolve) =>
+          setTimeout(resolve, backoffDelay(delayMs, attempt)),
+        );
         continue;
       }
 
@@ -494,5 +505,12 @@ async function sendRuntimeMessageWithRetry<T>(
     }
   }
 
-  throw new Error("Unable to connect to the extension automatically. Please try again.");
+  throw new Error(
+    "Unable to connect to the extension automatically. Please try again.",
+  );
+}
+
+function backoffDelay(baseDelayMs: number, attempt: number): number {
+  const maxDelayMs = 2_000;
+  return Math.min(baseDelayMs * 2 ** attempt, maxDelayMs);
 }

@@ -37,9 +37,13 @@ export interface ConversationCollectorOptions {
 }
 
 const DEFAULT_OPTIONS: Required<ConversationCollectorOptions> = {
+  // Upper bound on scroll passes so a slow/endless page cannot loop forever.
   maxPasses: 120,
+  // Passes with an unchanged top scroll position before we treat it as settled.
   stableTopPasses: 2,
+  // Extra passes to keep trying when the conversation start cannot be detected.
   unknownTopPasses: 6,
+  // Pixel slack when comparing scroll positions between passes.
   topTolerance: 2,
 };
 
@@ -81,8 +85,7 @@ export class ConversationCollector {
         const reachedTop =
           currentViewport.scrollTop <= this.options.topTolerance;
 
-        const conversationStartFound =
-          this.reader.hasConversationStart();
+        const conversationStartFound = this.reader.hasConversationStart();
 
         onProgress?.({
           pass,

@@ -42,7 +42,10 @@ export default defineBackground(() => {
   browser.runtime.onMessage.addListener(
     (message: unknown, sender, sendResponse) => {
       if (!isTrustedSender(sender)) {
-        sendResponse({ ok: false, error: "Unauthorized extension message sender." });
+        sendResponse({
+          ok: false,
+          error: "Unauthorized extension message sender.",
+        });
         return false;
       }
 
@@ -157,7 +160,9 @@ async function compileInOffscreen(
     project,
   };
 
-  return sendMessageToOffscreenWithRetry<ChatTexCompileInOffscreenResponse>(request);
+  return sendMessageToOffscreenWithRetry<ChatTexCompileInOffscreenResponse>(
+    request,
+  );
 }
 
 async function sendMessageToOffscreenWithRetry<T>(
@@ -178,7 +183,8 @@ async function sendMessageToOffscreenWithRetry<T>(
 
       if (isNoReceiver && attempt < maxRetries - 1) {
         await closeCompilerDocument();
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        const backoffMs = Math.min(delayMs * 2 ** attempt, 2_000);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
         continue;
       }
 
@@ -248,9 +254,10 @@ async function downloadExport(
     payload,
   };
 
-  const prepared = await sendMessageToOffscreenWithRetry<ChatTexPrepareDownloadsOffscreenResponse>(
-    request,
-  );
+  const prepared =
+    await sendMessageToOffscreenWithRetry<ChatTexPrepareDownloadsOffscreenResponse>(
+      request,
+    );
 
   if (!prepared.ok) {
     return {

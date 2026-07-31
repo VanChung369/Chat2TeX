@@ -9,6 +9,7 @@ import {
   type ChatTexExtractConversationRequest,
   type ChatTexExtractConversationResponse,
 } from "@/src/shared/messages";
+import { debugWarn } from "@/src/shared/debug";
 
 type DetectionStatus = "loading" | "ready" | "unsupported" | "error";
 
@@ -94,7 +95,7 @@ export default function App() {
 
       setStatus("ready");
     } catch (error) {
-      console.warn("[ChatTeX] ChatGPT page was not detected", error);
+      debugWarn("[ChatTeX] ChatGPT page was not detected", error);
 
       setConversation(null);
       setStatus("unsupported");
@@ -495,9 +496,7 @@ export default function App() {
                   }}
                 >
                   ⬇️{" "}
-                  {exportPdfOnly
-                    ? "Download PDF"
-                    : "Download PDF + TEX + ZIP"}
+                  {exportPdfOnly ? "Download PDF" : "Download PDF + TEX + ZIP"}
                 </button>
               </section>
             )}

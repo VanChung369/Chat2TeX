@@ -14,6 +14,9 @@ import type {
 const ELEMENT_NODE = 1;
 const TEXT_NODE = 3;
 
+// Guards against stack overflow on pathologically nested HTML.
+const MAX_BLOCK_DEPTH = 100;
+
 const IGNORED_TAGS = new Set([
   "BUTTON",
   "SCRIPT",
@@ -66,7 +69,15 @@ export class HtmlToAstParser {
     return this.parseBlockNodes(Array.from(template.content.childNodes));
   }
 
-  private parseBlockNodes(nodes: Node[]): BlockNode[] {
+  private parseBlockNodes(nodes: Node[], depth = 0): BlockNode[] {
+    if (depth > MAX_BLOCK_DEPTH) {
+      const children = compactInlineNodes(
+        nodes.flatMap((node) => this.parseInlineNode(node)),
+      );
+
+      return children.length === 0 ? [] : [{ type: "paragraph", children }];
+    }
+
     const blocks: BlockNode[] = [];
     let inlineBuffer: InlineNode[] = [];
 
@@ -102,7 +113,7 @@ export class HtmlToAstParser {
         continue;
       }
 
-      const parsedBlocks = this.parseBlockElement(element);
+      const parsedBlocks = this.parseBlockElement(element, depth);
 
       if (parsedBlocks === null) {
         inlineBuffer.push(...this.parseInlineNode(element));
@@ -119,7 +130,10 @@ export class HtmlToAstParser {
     return blocks;
   }
 
-  private parseBlockElement(element: HTMLElement): BlockNode[] | null {
+  private parseBlockElement(
+    element: HTMLElement,
+    depth: number,
+  ): BlockNode[] | null {
     const displayMath = this.extractDisplayMath(element);
 
     if (displayMath) {
@@ -161,13 +175,16 @@ export class HtmlToAstParser {
 
       case "UL":
       case "OL":
-        return [this.parseList(element)];
+        return [this.parseList(element, depth)];
 
       case "BLOCKQUOTE":
         return [
           {
             type: "quote",
-            blocks: this.parseBlockNodes(Array.from(element.childNodes)),
+            blocks: this.parseBlockNodes(
+              Array.from(element.childNodes),
+              depth + 1,
+            ),
           },
         ];
 
@@ -199,7 +216,7 @@ export class HtmlToAstParser {
     }
 
     if (CONTAINER_TAGS.has(element.tagName)) {
-      return this.parseBlockNodes(Array.from(element.childNodes));
+      return this.parseBlockNodes(Array.from(element.childNodes), depth + 1);
     }
 
     return null;
@@ -248,7 +265,7 @@ export class HtmlToAstParser {
     };
   }
 
-  private parseList(element: HTMLElement): ListBlock {
+  private parseList(element: HTMLElement, depth: number): ListBlock {
     const ordered = element.tagName === "OL";
 
     const startValue = ordered
@@ -266,7 +283,7 @@ export class HtmlToAstParser {
       start: ordered && !Number.isNaN(startValue) ? startValue : null,
 
       items: listItems.map((item) => ({
-        blocks: this.parseBlockNodes(Array.from(item.childNodes)),
+        blocks: this.parseBlockNodes(Array.from(item.childNodes), depth + 1),
       })),
     };
   }
@@ -459,9 +476,7 @@ export class HtmlToAstParser {
   }
 }
 
-function readImagePresentation(
-  element: HTMLElement,
-): ImagePresentation {
+function readImagePresentation(element: HTMLElement): ImagePresentation {
   return element.getAttribute("data-chattex-image-presentation") === "icon"
     ? "icon"
     : "content";
@@ -551,9 +566,7 @@ const CODE_LANGUAGE_ALIASES = new Set([
   "xml",
 ]);
 
-function readRecognizedLanguageLabel(
-  container: Element | null,
-): string | null {
+function readRecognizedLanguageLabel(container: Element | null): string | null {
   if (!container) {
     return null;
   }

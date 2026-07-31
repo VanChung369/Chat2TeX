@@ -3,6 +3,7 @@ import {
   CHATTEX_IMAGE_PRESENTATION_ATTRIBUTE,
   classifyImageSource,
 } from "./image-eligibility";
+import { debugWarn } from "@/src/shared/debug";
 
 export interface ApiConversationSource {
   read(): Promise<ChatConversation>;
@@ -29,7 +30,11 @@ export class CompleteConversationReader {
           this.mountedSource(),
           this.documentRef,
         );
-      } catch {
+      } catch (enrichError) {
+        debugWarn(
+          "[ChatTeX] Image enrichment failed; using API conversation without mounted images.",
+          enrichError,
+        );
         return apiConversation;
       }
     } catch (apiError) {
@@ -123,10 +128,7 @@ function appendUniqueImages(
       image.getAttribute(CHATTEX_IMAGE_PRESENTATION_ATTRIBUTE) ??
       classifyImageSource(source);
 
-    imageClone.setAttribute(
-      CHATTEX_IMAGE_PRESENTATION_ATTRIBUTE,
-      presentation,
-    );
+    imageClone.setAttribute(CHATTEX_IMAGE_PRESENTATION_ATTRIBUTE, presentation);
     apiTemplate.content.append(imageClone);
   }
 
