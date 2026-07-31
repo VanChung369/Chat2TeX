@@ -411,8 +411,7 @@ describe("LatexGenerator", () => {
               children: [
                 {
                   type: "text",
-                  value:
-                    `Giải thích cách xuất toàn bộ hội thoại bằng ${decomposedVietnamese}.`,
+                  value: `Giải thích cách xuất toàn bộ hội thoại bằng ${decomposedVietnamese}.`,
                 },
               ],
             },
@@ -429,9 +428,7 @@ describe("LatexGenerator", () => {
 
     expect(result.source).toContain("\\usepackage{polyglossia}");
     expect(result.source).toContain("\\setdefaultlanguage{vietnamese}");
-    expect(result.source).toContain(
-      "\\renewcommand{\\contentsname}{Contents}",
-    );
+    expect(result.source).toContain("\\renewcommand{\\contentsname}{Contents}");
     expect(result.source).toContain("Reader's question");
     expect(result.source).toContain("\\chatquestionsection{Question 2}");
     expect(result.source).toContain("Source:");
@@ -464,9 +461,7 @@ describe("LatexGenerator", () => {
       ],
     });
 
-    expect(result.source).toContain(
-      'const lờiChào = "Tiếng Việt"; // đầy đủ',
-    );
+    expect(result.source).toContain('const lờiChào = "Tiếng Việt"; // đầy đủ');
     expect(result.source).not.toContain(decomposedVietnamese);
     expect(result.source).toContain("literate=");
     expect(result.source).toContain("{ế}{{ế}}1");
@@ -491,9 +486,7 @@ describe("LatexGenerator", () => {
     expect(source).toContain("morecomment=[s]{/*}{*/}");
     expect(source).toContain('morestring=[b]"');
     expect(source).toContain("morestring=[b]'");
-    expect(source).toContain(
-      "\\begin{lstlisting}[language=ChatTypeScript]",
-    );
+    expect(source).toContain("\\begin{lstlisting}[language=ChatTypeScript]");
   });
 
   it("uses a bundled JavaScript definition instead of an unavailable listings language", () => {
@@ -505,33 +498,24 @@ describe("LatexGenerator", () => {
     ).source;
 
     expect(source).toContain("\\lstdefinelanguage{ChatJavaScript}");
-    expect(source).toContain(
-      "\\begin{lstlisting}[language=ChatJavaScript]",
-    );
-    expect(source).not.toContain(
-      "\\begin{lstlisting}[language=JavaScript]",
-    );
+    expect(source).toContain("\\begin{lstlisting}[language=ChatJavaScript]");
+    expect(source).not.toContain("\\begin{lstlisting}[language=JavaScript]");
   });
 
   it.each([
     ["css", "ChatCSS"],
     ["html", "ChatHTML"],
     ["xml", "ChatHTML"],
-  ])(
-    "uses the bundled %s listings definition",
-    (language, listingLanguage) => {
-      const source = new LatexGenerator().generate(
-        createCodeDocument(language, "<main class='page'>color: red;</main>"),
-      ).source;
+  ])("uses the bundled %s listings definition", (language, listingLanguage) => {
+    const source = new LatexGenerator().generate(
+      createCodeDocument(language, "<main class='page'>color: red;</main>"),
+    ).source;
 
-      expect(source).toContain(
-        `\\lstdefinelanguage{${listingLanguage}}`,
-      );
-      expect(source).toContain(
-        `\\begin{lstlisting}[language=${listingLanguage}]`,
-      );
-    },
-  );
+    expect(source).toContain(`\\lstdefinelanguage{${listingLanguage}}`);
+    expect(source).toContain(
+      `\\begin{lstlisting}[language=${listingLanguage}]`,
+    );
+  });
 
   it("escapes code-number macro parameters nested inside IfFileExists", () => {
     const source = new LatexGenerator().generate(
@@ -576,8 +560,12 @@ describe("LatexGenerator", () => {
 
     const result = generator.generate(createDocument(), "editorial-book");
 
-    expect(result.source).toContain("\\definecolor{codebackground}{HTML}{F7FAFC}");
-    expect(result.source).toContain("\\definecolor{codeforeground}{HTML}{1A202C}");
+    expect(result.source).toContain(
+      "\\definecolor{codebackground}{HTML}{F7FAFC}",
+    );
+    expect(result.source).toContain(
+      "\\definecolor{codeforeground}{HTML}{1A202C}",
+    );
     expect(result.source).toContain("\\definecolor{codekeyword}{HTML}{3182CE}");
     expect(result.source).toContain("\\definecolor{codestring}{HTML}{DD6B20}");
     expect(result.source).toContain("\\definecolor{codecomment}{HTML}{38A169}");
@@ -588,16 +576,14 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain(
       "\\begin{lstlisting}[language=ChatTypeScript]",
     );
-    expect(result.source).toContain(
-      "backgroundcolor=\\color{codebackground}",
-    );
+    expect(result.source).toContain("backgroundcolor=\\color{codebackground}");
     expect(result.source).toContain(
       "basicstyle=\\ttfamily\\footnotesize\\color{codeforeground}",
     );
+    expect(result.source).toContain("identifierstyle=\\color{codeforeground}");
     expect(result.source).toContain(
-      "identifierstyle=\\color{codeforeground}",
+      "\\providecommand{\\chatcodenumber}[1]{#1}",
     );
-    expect(result.source).toContain("\\providecommand{\\chatcodenumber}[1]{#1}");
     expect(result.source).toContain("numberstyle=\\tiny\\color{bookmuted}");
     expect(result.source).toContain("numbers=left");
     expect(result.source).not.toContain("title={JavaScript}");
@@ -671,9 +657,7 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain(
       "{\\small\\itshape\\color{bookmuted}System architecture\\par}",
     );
-    expect(result.source).toContain(
-      "\\IfFileExists{assets/image-001.png}",
-    );
+    expect(result.source).toContain("\\IfFileExists{assets/image-001.png}");
     expect(result.source).toContain("\\usepackage[export]{adjustbox}");
     expect(result.source).toContain("\\newlength{\\maxwidth}");
     expect(result.source).toContain("\\newlength{\\maxheight}");
@@ -713,9 +697,7 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain("\\begin{chattexiconrow}");
     expect(result.source).toContain("max width=1.4em");
     expect(result.source).toContain("max height=1.4em");
-    expect(
-      result.source.match(/\\begin\{chattexiconrow\}/g),
-    ).toHaveLength(1);
+    expect(result.source.match(/\\begin\{chattexiconrow\}/g)).toHaveLength(1);
     expect(result.source).toContain("\\texttt{[icon unavailable]}");
     expect(result.assets).toHaveLength(2);
   });
@@ -760,9 +742,7 @@ describe("LatexGenerator", () => {
     };
 
     const result = generator.generate(doc);
-    expect(result.source).toContain(
-      "console.log('Done! [U+1F680][U+1F44D]');",
-    );
+    expect(result.source).toContain("console.log('Done! [U+1F680][U+1F44D]');");
   });
 
   it("supports all 10 LaTeX document templates with distinct preambles", () => {
@@ -794,11 +774,19 @@ describe("LatexGenerator", () => {
     const generator = new LatexGenerator();
     const doc = createDocument();
 
-    const sepia = generator.generate(doc, { templateId: "academic", paperColor: "sepia", fontFamily: "sans" }).source;
+    const sepia = generator.generate(doc, {
+      templateId: "academic",
+      paperColor: "sepia",
+      fontFamily: "sans",
+    }).source;
     expect(sepia).toContain("\\definecolor{bookpaper}{HTML}{FBF0D9}");
     expect(sepia).toContain("\\renewcommand{\\familydefault}{\\sfdefault}");
 
-    const dark = generator.generate(doc, { templateId: "academic", paperColor: "dark", fontFamily: "mono" }).source;
+    const dark = generator.generate(doc, {
+      templateId: "academic",
+      paperColor: "dark",
+      fontFamily: "mono",
+    }).source;
     expect(dark).toContain("\\definecolor{bookpaper}{HTML}{18181B}");
     expect(dark).toContain("\\renewcommand{\\familydefault}{\\ttdefault}");
   });
@@ -807,12 +795,16 @@ describe("LatexGenerator", () => {
     const generator = new LatexGenerator();
     const doc = createDocument();
 
-    const noUser = generator.generate(doc, { includeUserMessages: false }).source;
+    const noUser = generator.generate(doc, {
+      includeUserMessages: false,
+    }).source;
     expect(noUser).not.toContain("\\begin{readerquestion}");
 
     const msgIdToOmit = doc.messages[0]?.id;
     if (msgIdToOmit) {
-      const omitted = generator.generate(doc, { excludedMessageIds: [msgIdToOmit] }).source;
+      const omitted = generator.generate(doc, {
+        excludedMessageIds: [msgIdToOmit],
+      }).source;
       expect(omitted).not.toContain("Explain binary search with O(log n)");
     }
   });
@@ -821,11 +813,17 @@ describe("LatexGenerator", () => {
     const generator = new LatexGenerator();
     const doc = createDocument();
 
-    const letterPaper = generator.generate(doc, { paperSize: "letter", authorName: "Nguyen Van A" }).source;
+    const letterPaper = generator.generate(doc, {
+      paperSize: "letter",
+      authorName: "Nguyen Van A",
+    }).source;
     expect(letterPaper).toContain("letterpaper");
     expect(letterPaper).toContain("Nguyen Van A");
 
-    const a5Paper = generator.generate(doc, { paperSize: "a5", authorName: "Chat2TeX User" }).source;
+    const a5Paper = generator.generate(doc, {
+      paperSize: "a5",
+      authorName: "Chat2TeX User",
+    }).source;
     expect(a5Paper).toContain("a5paper");
     expect(a5Paper).toContain("Chat2TeX User");
   });
