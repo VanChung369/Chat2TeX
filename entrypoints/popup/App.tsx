@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "preact/hooks";
 
 import { useExportFlow } from "./use-export-flow";
 
@@ -39,10 +39,12 @@ export default function App() {
   const [includeUserMessages, setIncludeUserMessages] = useState(true);
   const exportFlow = useExportFlow();
 
-  const compilerRejectedAssets =
-    exportFlow.processedAssets?.failures.filter(
-      (failure) => failure.code === "compiler-rejected",
-    ) ?? [];
+  const omittedFiles = exportFlow.activeJob?.omittedFiles ?? [];
+  const hasActiveCompilerJob =
+    exportFlow.activeJob !== null &&
+    !["completed", "cancelled", "failed"].includes(
+      exportFlow.activeJob.phase,
+    );
 
   useEffect(() => {
     void detectConversation();
@@ -110,9 +112,15 @@ export default function App() {
     phase === "permission-required" ||
     phase === "processing-assets"
       ? 0
-      : phase === "ready" || phase === "compiling"
+      : phase === "ready" ||
+          phase === "downloading-compiler" ||
+          phase === "downloading-packages" ||
+          phase === "initializing" ||
+          phase === "compiling"
         ? 1
-        : phase === "compiled" || phase === "packaging"
+        : phase === "compiled" ||
+            phase === "packaging" ||
+            phase === "downloading-output"
           ? 2
           : phase === "downloaded"
             ? 3
@@ -126,8 +134,12 @@ export default function App() {
     exportFlow.phase === "preparing" ||
     exportFlow.phase === "permission-required" ||
     exportFlow.phase === "processing-assets" ||
+    exportFlow.phase === "downloading-compiler" ||
+    exportFlow.phase === "downloading-packages" ||
+    exportFlow.phase === "initializing" ||
     exportFlow.phase === "compiling" ||
-    exportFlow.phase === "packaging";
+    exportFlow.phase === "packaging" ||
+    exportFlow.phase === "downloading-output";
 
   return (
     <main className="popup">
@@ -182,7 +194,7 @@ export default function App() {
                   value={selectedTemplate}
                   onChange={(e) =>
                     setSelectedTemplate(
-                      e.target
+                      e.currentTarget
                         .value as import("@/src/features/latex/types").LatexTemplateId,
                     )
                   }
@@ -212,7 +224,7 @@ export default function App() {
                     value={selectedColor}
                     onChange={(e) =>
                       setSelectedColor(
-                        e.target
+                        e.currentTarget
                           .value as import("@/src/features/latex/types").LatexPaperColor,
                       )
                     }
@@ -235,7 +247,7 @@ export default function App() {
                     value={selectedFont}
                     onChange={(e) =>
                       setSelectedFont(
-                        e.target
+                        e.currentTarget
                           .value as import("@/src/features/latex/types").LatexFontFamily,
                       )
                     }
@@ -258,7 +270,7 @@ export default function App() {
                     value={selectedPaperSize}
                     onChange={(e) =>
                       setSelectedPaperSize(
-                        e.target
+                        e.currentTarget
                           .value as import("@/src/features/latex/types").LatexPaperSize,
                       )
                     }
@@ -280,7 +292,7 @@ export default function App() {
                     disabled={isProcessing}
                     placeholder="Optional..."
                     value={authorName}
-                    onChange={(e) => setAuthorName(e.target.value)}
+                    onChange={(e) => setAuthorName(e.currentTarget.value)}
                     style={{ cursor: isProcessing ? "not-allowed" : "text" }}
                   />
                 </div>
@@ -296,7 +308,9 @@ export default function App() {
                     id="app-user-check"
                     disabled={isProcessing}
                     checked={includeUserMessages}
-                    onChange={(e) => setIncludeUserMessages(e.target.checked)}
+                    onChange={(e) =>
+                      setIncludeUserMessages(e.currentTarget.checked)
+                    }
                   />
                   <span className="toggle-track" />
                 </label>
@@ -308,7 +322,9 @@ export default function App() {
                     id="app-pdfonly-check"
                     disabled={isProcessing}
                     checked={exportPdfOnly}
-                    onChange={(e) => setExportPdfOnly(e.target.checked)}
+                    onChange={(e) =>
+                      setExportPdfOnly(e.currentTarget.checked)
+                    }
                   />
                   <span className="toggle-track" />
                 </label>
@@ -448,40 +464,81 @@ export default function App() {
                 </section>
               )}
 
-            {exportFlow.phase === "compiling" && (
+            {[
+              "downloading-compiler",
+              "downloading-packages",
+              "initializing",
+              "compiling",
+            ].includes(exportFlow.phase) && (
               <section className="progress-card fade-in">
-                <strong>Compiling with XeLaTeX...</strong>
-                <p>Creating the PDF, please wait...</p>
+                <strong>
+                  {compilerProgressTitle(exportFlow.phase)}
+                </strong>
+                <p>
+                  {exportFlow.compilerProgress?.label ??
+                    "Preparing the XeTeX compiler…"}
+                </p>
+                {exportFlow.compilerProgress?.phase ===
+                  "downloading-compiler" && (
+                  <>
+                    <progress
+                      max={exportFlow.compilerProgress.total}
+                      value={exportFlow.compilerProgress.loaded}
+                    />
+                    <span>
+                      {formatFileSize(
+                        exportFlow.compilerProgress.loaded,
+                      )}{" "}
+                      /{" "}
+                      {formatFileSize(
+                        exportFlow.compilerProgress.total,
+                      )}
+                    </span>
+                  </>
+                )}
+                {exportFlow.compilerProgress?.phase ===
+                  "downloading-packages" && (
+                  <span>
+                    {exportFlow.compilerProgress.current} /{" "}
+                    {exportFlow.compilerProgress.total}
+                  </span>
+                )}
                 <div className="spinner-wrap">
                   <div className="spinner" />
                 </div>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={() => void exportFlow.cancel()}
+                >
+                  Cancel export
+                </button>
               </section>
             )}
 
-            {exportFlow.phase === "compiled" && exportFlow.pdfBase64 && (
+            {exportFlow.phase === "compiled" &&
+              exportFlow.activeJob && (
               <section className="export-ready fade-in">
                 <strong>🎉 Compilation successful!</strong>
                 <div className="stat-row">
                   <span className="stat-pill">
                     📄{" "}
                     {formatFileSize(
-                      Math.floor(exportFlow.pdfBase64.length * 0.75),
+                      exportFlow.activeJob.pdfByteLength ?? 0,
                     )}
                   </span>
                 </div>
-                {compilerRejectedAssets.length > 0 && (
+                {omittedFiles.length > 0 && (
                   <>
                     <p className="warning-text">
-                      ⚠️ {compilerRejectedAssets.length} images were omitted
+                      ⚠️ {omittedFiles.length} images were omitted
                       from the PDF.
                     </p>
                     <details className="diagnostic-details">
                       <summary>Omitted images</summary>
                       <ul>
-                        {compilerRejectedAssets.map((failure) => (
-                          <li key={failure.id}>
-                            <strong>{failure.id}</strong>: {failure.message}
-                          </li>
+                        {omittedFiles.map((path) => (
+                          <li key={path}>{path}</li>
                         ))}
                       </ul>
                     </details>
@@ -501,10 +558,15 @@ export default function App() {
               </section>
             )}
 
-            {exportFlow.phase === "packaging" && (
+            {(exportFlow.phase === "packaging" ||
+              exportFlow.phase === "downloading-output") && (
               <section className="progress-card fade-in">
-                <strong>Packaging files...</strong>
-                <p>Creating PDF, LaTeX, and ZIP files...</p>
+                <strong>
+                  {exportFlow.phase === "packaging"
+                    ? "Packaging selected files…"
+                    : "Starting browser downloads…"}
+                </strong>
+                <p>Only the output formats you selected are being built.</p>
                 <div className="spinner-wrap">
                   <div className="spinner" />
                 </div>
@@ -548,10 +610,35 @@ export default function App() {
               </section>
             )}
 
+            {exportFlow.phase === "cancelled" && (
+              <section className="compile-error fade-in">
+                <p className="collection-error">
+                  Export cancelled. Verified compiler files remain cached.
+                </p>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={() => {
+                    void exportFlow.prepare({
+                      templateId: selectedTemplate,
+                      paperColor: selectedColor,
+                      fontFamily: selectedFont,
+                      paperSize: selectedPaperSize,
+                      authorName,
+                      exportPdfOnly,
+                      includeUserMessages,
+                    });
+                  }}
+                >
+                  Start again
+                </button>
+              </section>
+            )}
+
             {exportFlow.phase === "error" && exportFlow.error && (
               <section className="compile-error fade-in">
                 <p className="collection-error">❌ {exportFlow.error}</p>
-                {!exportFlow.pdfBase64 && exportFlow.compileLog.trim() && (
+                {exportFlow.compileLog.trim() && (
                   <details className="diagnostic-details">
                     <summary>XeLaTeX Error Details</summary>
                     <pre className="compile-log">{exportFlow.compileLog}</pre>
@@ -615,11 +702,60 @@ export default function App() {
       </section>
 
       <footer className="popup__footer">
-        <span>Offline-first · XeLaTeX</span>
+        <div className="footer-details">
+          <div className="cache-disclosure">
+            <span>
+              Compiler cache:{" "}
+              {formatFileSize(exportFlow.cacheStatus?.totalBytes ?? 0)}
+            </span>
+            <button
+              type="button"
+              disabled={hasActiveCompilerJob}
+              title="Clearing requires downloading the compiler again before the next PDF export."
+              onClick={() => {
+                void exportFlow.clearCompilerCache();
+              }}
+            >
+              Clear cache
+            </button>
+          </div>
+          <div className="legal-links">
+            <span>Local XeLaTeX · AGPL-3.0</span>
+            <a
+              href={(
+                browser.runtime.getURL as (path: string) => string
+              )("legal.html")}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Legal
+            </a>
+            <a
+              href="https://github.com/VanChung369/Chat2TeX"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Source
+            </a>
+          </div>
+        </div>
         <span className="footer-badge">v0.1.0</span>
       </footer>
     </main>
   );
+}
+
+function compilerProgressTitle(phase: string): string {
+  switch (phase) {
+    case "downloading-compiler":
+      return "Downloading verified XeTeX core…";
+    case "downloading-packages":
+      return "Downloading required TeX package…";
+    case "initializing":
+      return "Initializing isolated XeTeX…";
+    default:
+      return "Compiling with XeTeX…";
+  }
 }
 
 interface StatusCardProps {

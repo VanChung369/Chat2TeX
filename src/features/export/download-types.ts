@@ -2,15 +2,17 @@ import type { FailedExportAsset } from "./types";
 
 import type { ResolvedAssetFile } from "@/src/features/assets/types";
 
+import type { OutputKind } from "./output-plan";
+
 export interface DownloadExportPayload {
   title: string;
   url: string;
   exportedAtIso: string;
   latexSource: string;
-  pdfBase64: string;
+  pdfBase64?: string;
   files: ResolvedAssetFile[];
   failures: FailedExportAsset[];
-  exportPdfOnly?: boolean;
+  outputKinds: OutputKind[];
 }
 
 export interface DownloadArtifactDescriptor {

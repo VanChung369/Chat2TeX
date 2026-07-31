@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { LatexCompiler } from "@/src/features/compiler/latex-compiler";
+import { SandboxCompilerCrashError } from "@/src/features/compiler/sandbox-compiler-client";
 
 import type { LatexEngine } from "@/src/features/compiler/types";
 
@@ -15,6 +16,8 @@ function createEngine(): LatexEngine {
     }),
 
     terminate: vi.fn(),
+
+    restartAfterCrash: vi.fn(),
   };
 }
 
@@ -42,6 +45,67 @@ describe("LatexCompiler", () => {
 
     expect(engine.initialize).toHaveBeenCalledTimes(1);
 
+    expect(engine.compile).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes the job abort signal through initialization and compilation", async () => {
+    const engine = createEngine();
+    const compiler = new LatexCompiler(engine);
+    const controller = new AbortController();
+    const project = {
+      source: "\\begin{document}A\\end{document}",
+      files: [],
+    };
+
+    await compiler.compile(project, controller.signal);
+
+    expect(engine.initialize).toHaveBeenCalledWith(controller.signal);
+    expect(engine.compile).toHaveBeenCalledWith(
+      project,
+      controller.signal,
+    );
+  });
+
+  it("recreates the sandbox and retries the entire job once after a crash", async () => {
+    const engine = createEngine();
+    vi.mocked(engine.compile)
+      .mockRejectedValueOnce(
+        new SandboxCompilerCrashError("Sandbox compile timed out."),
+      )
+      .mockResolvedValueOnce({
+        pdf: new Uint8Array([37, 80, 68, 70]),
+        log: "Recovered",
+      });
+    const compiler = new LatexCompiler(engine);
+    const project = {
+      source: "\\begin{document}A\\end{document}",
+      files: [],
+    };
+
+    await expect(compiler.compile(project)).resolves.toMatchObject({
+      log: "Recovered",
+    });
+
+    expect(engine.restartAfterCrash).toHaveBeenCalledOnce();
+    expect(engine.initialize).toHaveBeenCalledTimes(2);
+    expect(engine.compile).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a second sandbox crash", async () => {
+    const engine = createEngine();
+    vi.mocked(engine.compile).mockRejectedValue(
+      new SandboxCompilerCrashError("Sandbox compile timed out."),
+    );
+    const compiler = new LatexCompiler(engine);
+
+    await expect(
+      compiler.compile({
+        source: "\\begin{document}A\\end{document}",
+        files: [],
+      }),
+    ).rejects.toBeInstanceOf(SandboxCompilerCrashError);
+
+    expect(engine.restartAfterCrash).toHaveBeenCalledOnce();
     expect(engine.compile).toHaveBeenCalledTimes(2);
   });
 

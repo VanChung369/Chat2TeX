@@ -2,7 +2,7 @@
 
 ## Context
 
-Chat2TeX is a WXT, React, and TypeScript browser extension that exports
+Chat2TeX is a WXT, Preact, and TypeScript browser extension that exports
 ChatGPT conversations to LaTeX, ZIP, and locally compiled PDF files. The
 current Chrome MV3 production ZIP is approximately 503 MB because it bundles
 about 648 MB of BusyTeX and TeX Live assets under `public/texlive`.
@@ -53,7 +53,9 @@ new BusyTeX release.
 ## Non-Goals
 
 - Supporting Firefox or another browser in this change.
-- Supporting pdfTeX, LuaTeX, or the BusyTeX combined-engine bundle.
+- Exposing pdfTeX or LuaTeX as selectable compilation engines. The official
+  `assets-v1.2.3` release publishes only the combined BusyTeX binary, so that
+  binary is accepted while the application protocol remains locked to XeTeX.
 - Moving compilation to a server.
 - Adding accounts, cloud sync, export history, or cross-device compiler cache.
 - Resuming an interrupted compilation after the entire browser restarts.
@@ -64,11 +66,12 @@ new BusyTeX release.
 
 ### Selected: isolated, on-demand browser compiler
 
-The extension downloads a pinned XeTeX-only BusyTeX runtime and basic data on
-first use. Missing TeX Live packages are fetched from a fixed package
-endpoint. All remote executable material runs only in a manifest-declared
-sandbox without Chrome APIs. Assets and packages are cached by version and
-content hash.
+The extension downloads the pinned official BusyTeX runtime and basic data on
+first use. Its public protocol exposes only the XeTeX driver; pdfTeX and
+LuaTeX cannot be selected. Missing TeX Live packages are fetched from a fixed
+package endpoint. All remote executable material runs only in a
+manifest-declared sandbox without Chrome APIs. Assets and packages are cached
+by version and content hash.
 
 This approach reaches the distribution-size target, keeps local compilation,
 and preserves broad package compatibility after on-demand downloads. It adds
@@ -192,13 +195,19 @@ on-demand package bytes.
 ### Asset distribution and integrity
 
 The upstream BusyTeX release is a single approximately 503 MB archive, so it
-is not downloaded directly at runtime. A release-preparation script produces
-a slim, split asset set containing only:
+is not downloaded directly at runtime. That release does not include separate
+`xetex.js` or `xetex.wasm` artifacts. A release-preparation script therefore
+produces a slim, split asset set containing only:
 
 - BusyTeX pipeline and worker files required by XeTeX;
-- `xetex.js` and `xetex.wasm`;
+- the released `busytex.js` and `busytex.wasm` engine runtime;
 - `texlive-basic.js` and `texlive-basic.data`;
-- any fixed XeTeX driver assets proven necessary by the smoke test.
+- no recommended or extra TeX Live data package.
+
+The six files total exactly 125,645,625 bytes in `assets-v1.2.3`. Although the
+WASM binary contains other engines, the sandbox compile protocol hardcodes
+`xetex_bibtex8_dvipdfmx`, disables shell escape, and exposes no arbitrary
+driver or engine field.
 
 These immutable files are published as public release assets for the
 corresponding Chat2TeX compiler version. Production URLs are versioned and
@@ -266,11 +275,14 @@ actionable storage message instead of deleting the working version first.
 3. The coordinator records the reconnectable snapshot in
    `chrome.storage.session`, writes a minimal text-free active-job recovery
    marker to `chrome.storage.local`, and keeps source and binary payloads only
-   in offscreen memory.
+   in offscreen memory. Because offscreen documents expose only the Runtime
+   extension API, a sender-validated background RPC performs these storage
+   operations.
 4. The coordinator loads the pinned root manifest and checks the core cache.
 5. Missing assets are downloaded, size-limited, hashed, and atomically cached.
 6. The coordinator creates the sandbox and transfers the verified assets.
-7. The sandbox initializes the XeTeX-only runner.
+7. The sandbox initializes the BusyTeX runner with its compile protocol
+   locked to the XeTeX driver.
 8. The coordinator sends LaTeX source and project images to the sandbox.
 9. When XeTeX needs an uncached file, the worker shim records the canonical
    lookup and finishes that compile pass with a local miss.
@@ -440,7 +452,7 @@ assets into the packaged extension.
 The first implementation slice is a production-shaped sandbox spike. It must
 prove all of the following before the remaining migration proceeds:
 
-- the manifest-declared sandbox can initialize the XeTeX-only BusyTeX runtime
+- the manifest-declared sandbox can initialize the official BusyTeX runtime
   from coordinator-supplied, hash-verified bytes;
 - Blob-backed worker and WASM loading work under the final sandbox CSP;
 - the sandbox can compile a minimal Vietnamese XeLaTeX document;
@@ -468,7 +480,8 @@ server to bypass this gate.
 
 ### Integration tests
 
-- cold start downloads only XeTeX and basic core assets;
+- cold start downloads only the six pinned BusyTeX/basic core assets and the
+  runtime accepts only XeTeX compile jobs;
 - warm start performs no core network requests;
 - cached packages compile while offline;
 - an uncached required package produces the correct download and progress;

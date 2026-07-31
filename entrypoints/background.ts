@@ -9,22 +9,35 @@ import { BrowserImageConverter } from "@/src/features/assets/browser-image-conve
 import { ImageDataProcessor } from "@/src/features/assets/image-data-processor";
 
 import {
+  CHATTEX_COMPILER_OFFSCREEN_TARGET,
+  CHATTEX_PREPARE_COMPILER_JOB_ARTIFACTS,
+  CHATTEX_RECORD_COMPILER_JOB_DOWNLOADS,
+  isCancelCompilerJobRequest,
+  isClearCompilerCacheRequest,
+  isCompilerOffscreenTargetedMessage,
+  isCompilerStorageRequest,
   isConvertImageDataRequest,
+  isDownloadCompilerJobRequest,
+  isGetCompilerCacheStatusRequest,
+  isGetCompilerJobDiagnosticsRequest,
+  isGetCompilerJobRequest,
   isProcessImageAssetRequest,
-  CHATTEX_COMPILE_IN_OFFSCREEN,
-  isCompileLatexRequest,
-  CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN,
-  isDownloadExportRequest,
-  type ChatTexCompileInOffscreenRequest,
-  type ChatTexCompileInOffscreenResponse,
-  type ChatTexDownloadExportResponse,
-  type ChatTexPrepareDownloadsOffscreenRequest,
-  type ChatTexPrepareDownloadsOffscreenResponse,
+  isStartCompilerJobRequest,
+  type ChatTexDownloadCompilerJobResponse,
 } from "@/src/shared/messages";
+import {
+  isBackgroundRuntimeSender,
+  isCompilerDocumentRuntimeSender,
+  isTrustedPublicRuntimeSender,
+} from "@/src/shared/trusted-message-sender";
+import {
+  runCompilerStorageRequest,
+  type BrowserStorageAreaLike,
+} from "@/src/features/compiler/runtime-storage-area";
 
 import type {
   DownloadArtifactDescriptor,
-  DownloadExportPayload,
+  PrepareDownloadResult,
   StartedDownload,
 } from "@/src/features/export/download-types";
 
@@ -41,12 +54,80 @@ export default defineBackground(() => {
 
   browser.runtime.onMessage.addListener(
     (message: unknown, sender, sendResponse) => {
-      if (!isTrustedSender(sender)) {
+      if (
+        isCompilerOffscreenTargetedMessage(message) ||
+        isBackgroundRuntimeSender(
+          sender,
+          browser.runtime.id,
+          getBackgroundUrl(),
+        )
+      ) {
+        return;
+      }
+
+      if (isCompilerStorageRequest(message)) {
+        if (
+          !isCompilerDocumentRuntimeSender(
+            sender,
+            browser.runtime.id,
+            getCompilerDocumentUrl(),
+          )
+        ) {
+          sendResponse({
+            ok: false,
+            error: "Unauthorized compiler storage sender.",
+          });
+          return false;
+        }
+        void runCompilerStorageRequest(message, {
+          local: browser.storage.local as BrowserStorageAreaLike,
+          session: browser.storage.session as BrowserStorageAreaLike,
+        }).then(sendResponse);
+        return true;
+      }
+
+      if (
+        !isTrustedPublicRuntimeSender(sender, browser.runtime.id)
+      ) {
         sendResponse({
           ok: false,
           error: "Unauthorized extension message sender.",
         });
         return false;
+      }
+
+      if (
+        isStartCompilerJobRequest(message) ||
+        isGetCompilerJobRequest(message) ||
+        isGetCompilerJobDiagnosticsRequest(message) ||
+        isCancelCompilerJobRequest(message) ||
+        isGetCompilerCacheStatusRequest(message) ||
+        isClearCompilerCacheRequest(message)
+      ) {
+        void sendCompilerCommandToOffscreen(message)
+          .then(sendResponse)
+          .catch((error) => {
+            sendResponse({
+              ok: false,
+              error: readErrorMessage(error),
+            });
+          });
+        return true;
+      }
+
+      if (isDownloadCompilerJobRequest(message)) {
+        void downloadCompilerJob(message.jobId)
+          .then(sendResponse)
+          .catch((error) => {
+            const response: ChatTexDownloadCompilerJobResponse = {
+              ok: false,
+              error: readErrorMessage(error),
+              snapshot: null,
+              downloads: [],
+            };
+            sendResponse(response);
+          });
+        return true;
       }
 
       if (isProcessImageAssetRequest(message)) {
@@ -81,89 +162,28 @@ export default defineBackground(() => {
         return true;
       }
 
-      if (isCompileLatexRequest(message)) {
-        void compileInOffscreen(message.project)
-          .then(sendResponse)
-          .catch((error) => {
-            sendResponse({
-              ok: false,
-
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Unable to start compiler.",
-
-              log: "",
-            });
-          });
-
-        return true;
-      }
-
-      if (isDownloadExportRequest(message)) {
-        void downloadExport(message.payload)
-          .then(sendResponse)
-          .catch((error) => {
-            const response: ChatTexDownloadExportResponse = {
-              ok: false,
-
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Unable to download export files.",
-
-              downloads: [],
-            };
-
-            sendResponse(response);
-          });
-
-        return true;
-      }
-
       return;
     },
   );
 });
 
-function isTrustedSender(sender: Browser.runtime.MessageSender): boolean {
-  if (sender.id !== browser.runtime.id) {
-    return false;
-  }
-
-  if (!sender.tab?.url) {
-    return true;
-  }
-
-  try {
-    const hostname = new URL(sender.tab.url).hostname;
-    return /^(?:.+\.)?(?:chatgpt\.com|openai\.com)$/i.test(hostname);
-  } catch {
-    return false;
-  }
-}
-
 function readErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown background error.";
 }
 
-let creatingOffscreenDocument: Promise<void> | null = null;
-
-async function compileInOffscreen(
-  project: ChatTexCompileInOffscreenRequest["project"],
-): Promise<ChatTexCompileInOffscreenResponse> {
-  await ensureCompilerDocument();
-
-  const request: ChatTexCompileInOffscreenRequest = {
-    type: CHATTEX_COMPILE_IN_OFFSCREEN,
-
-    project,
-  };
-
-  return sendMessageToOffscreenWithRetry<ChatTexCompileInOffscreenResponse>(
-    request,
+function getBackgroundUrl(): string {
+  return (browser.runtime.getURL as (path: string) => string)(
+    "background.js",
   );
 }
+
+function getCompilerDocumentUrl(): string {
+  return (browser.runtime.getURL as (path: string) => string)(
+    "compiler.html",
+  );
+}
+
+let creatingOffscreenDocument: Promise<void> | null = null;
 
 async function sendMessageToOffscreenWithRetry<T>(
   message: unknown,
@@ -193,6 +213,15 @@ async function sendMessageToOffscreenWithRetry<T>(
   }
 
   throw new Error("The PDF compiler is not ready. Please try again.");
+}
+
+async function sendCompilerCommandToOffscreen<T>(
+  message: object,
+): Promise<T> {
+  return sendMessageToOffscreenWithRetry<T>({
+    ...message,
+    target: CHATTEX_COMPILER_OFFSCREEN_TARGET,
+  });
 }
 
 async function closeCompilerDocument(): Promise<void> {
@@ -243,56 +272,64 @@ async function ensureCompilerDocument(): Promise<void> {
   await creatingOffscreenDocument;
 }
 
-async function downloadExport(
-  payload: DownloadExportPayload,
-): Promise<ChatTexDownloadExportResponse> {
-  await ensureCompilerDocument();
-
-  const request: ChatTexPrepareDownloadsOffscreenRequest = {
-    type: CHATTEX_PREPARE_DOWNLOADS_OFFSCREEN,
-
-    payload,
-  };
-
+async function downloadCompilerJob(
+  jobId: string,
+): Promise<ChatTexDownloadCompilerJobResponse> {
   const prepared =
-    await sendMessageToOffscreenWithRetry<ChatTexPrepareDownloadsOffscreenResponse>(
-      request,
+    await sendCompilerCommandToOffscreen<PrepareDownloadResult>(
+      {
+        type: CHATTEX_PREPARE_COMPILER_JOB_ARTIFACTS,
+        jobId,
+      },
     );
-
   if (!prepared.ok) {
     return {
       ok: false,
       error: prepared.error,
+      snapshot: null,
       downloads: [],
     };
   }
 
   const downloads: StartedDownload[] = [];
-
-  const artifactsToDownload = payload.exportPdfOnly
-    ? prepared.artifacts.filter((artifact) => artifact.kind === "pdf")
-    : prepared.artifacts;
-
-  for (const artifact of artifactsToDownload) {
+  for (const artifact of prepared.artifacts) {
     downloads.push(await startArtifactDownload(artifact));
   }
 
-  const failed = downloads.filter((download) => download.error !== null);
-
-  if (failed.length > 0) {
+  const recorded = await sendCompilerCommandToOffscreen<{
+    ok: boolean;
+    snapshot?: import("@/src/features/compiler/compiler-job-types").CompilerJobSnapshot;
+    error?: string;
+  }>({
+    type: CHATTEX_RECORD_COMPILER_JOB_DOWNLOADS,
+    jobId,
+    downloads,
+  });
+  if (!recorded.ok || !recorded.snapshot) {
     return {
       ok: false,
-
-      error: `${failed.length} file downloads failed.`,
-
+      error:
+        recorded.error ?? "Unable to record export downloads.",
+      snapshot: null,
       downloads,
     };
   }
 
-  return {
-    ok: true,
-    downloads,
-  };
+  const failed = downloads.filter(
+    (download) => download.error !== null,
+  );
+  return failed.length === 0
+    ? {
+        ok: true,
+        snapshot: recorded.snapshot,
+        downloads,
+      }
+    : {
+        ok: false,
+        error: `${failed.length} file downloads failed.`,
+        snapshot: recorded.snapshot,
+        downloads,
+      };
 }
 
 async function startArtifactDownload(

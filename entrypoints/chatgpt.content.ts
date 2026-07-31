@@ -17,12 +17,17 @@ import { prepareConversationExport } from "@/src/features/export/prepare-convers
 import { PageImageReader } from "@/src/features/assets/page-image-reader";
 
 import {
+  CHATTEX_DOWNLOAD_COMPILER_JOB,
+  CHATTEX_GET_COMPILER_JOB,
+  CHATTEX_START_COMPILER_JOB,
   isChatTexPingRequest,
   isCollectConversationRequest,
   isExtractConversationRequest,
   isPrepareExportRequest,
   isReadPageImageRequest,
   type ChatTexCollectConversationResponse,
+  type ChatTexCompilerJobSnapshotResponse,
+  type ChatTexDownloadCompilerJobResponse,
   type ChatTexPrepareExportResponse,
   type PingResponse,
 } from "@/src/shared/messages";
@@ -39,9 +44,7 @@ import { debugLog } from "@/src/shared/debug";
 export default defineContentScript({
   matches: [
     "https://chatgpt.com/*",
-    "https://*.chatgpt.com/*",
     "https://chat.openai.com/*",
-    "https://*.openai.com/*",
   ],
   runAt: "document_idle",
 
@@ -135,39 +138,74 @@ export default defineContentScript({
       }
       const { files, failures } = await processInPageAssets(prepared);
 
-      updateStatus("2/3 Compiling XeLaTeX PDF...");
-      const compileResponse = (await sendRuntimeMessageWithRetry({
-        type: "CHATTEX_COMPILE_LATEX",
-        project: {
-          source: prepared.latexSource,
-          files: files.map((f) => ({ path: f.outputPath, base64: f.base64 })),
-        },
-      })) as { ok: boolean; pdfBase64?: string; error?: string };
-
-      if (!compileResponse?.ok || !compileResponse.pdfBase64) {
+      const outputKinds: import("@/src/features/export/output-plan").OutputKind[] =
+        options.exportPdfOnly
+          ? ["pdf"]
+          : ["pdf", "tex", "source"];
+      const started =
+        await sendRuntimeMessageWithRetry<ChatTexCompilerJobSnapshotResponse>(
+          {
+            type: CHATTEX_START_COMPILER_JOB,
+            payload: {
+              title: prepared.title,
+              url: prepared.url,
+              messageCount: prepared.messageCount,
+              exportedAtIso: new Date().toISOString(),
+              latexSource: prepared.latexSource,
+              files,
+              failures,
+              outputKinds,
+            },
+          },
+        );
+      if (!started.ok || !started.snapshot) {
         throw new Error(
-          compileResponse?.error || "XeLaTeX compilation failed.",
+          started.ok
+            ? "Compiler job did not start."
+            : started.error,
         );
       }
 
-      updateStatus("3/3 Finalizing and downloading...");
-      const downloadResponse = (await sendRuntimeMessageWithRetry({
-        type: "CHATTEX_DOWNLOAD_EXPORT",
-        payload: {
-          title: prepared.title,
-          url: prepared.url,
-          exportedAtIso: new Date().toISOString(),
-          latexSource: prepared.latexSource,
-          pdfBase64: compileResponse.pdfBase64,
-          files,
-          failures,
-          exportPdfOnly: options.exportPdfOnly,
-        },
-      })) as { ok: boolean; error?: string };
+      let job = started.snapshot;
+      while (
+        !["completed", "cancelled", "failed"].includes(job.phase)
+      ) {
+        updateStatus(describeCompilerJob(job));
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        const refreshed =
+          await sendRuntimeMessageWithRetry<ChatTexCompilerJobSnapshotResponse>(
+            {
+              type: CHATTEX_GET_COMPILER_JOB,
+              jobId: job.jobId,
+            },
+          );
+        if (!refreshed.ok || !refreshed.snapshot) {
+          throw new Error(
+            refreshed.ok
+              ? "Compiler job disappeared."
+              : refreshed.error,
+          );
+        }
+        job = refreshed.snapshot;
+      }
+      if (job.phase === "failed") {
+        throw new Error(job.error ?? "XeTeX compilation failed.");
+      }
+      if (job.phase === "cancelled") {
+        throw new Error("The export was cancelled.");
+      }
 
-      if (!downloadResponse?.ok) {
+      updateStatus("3/3 Packaging and starting downloads...");
+      const downloadResponse =
+        await sendRuntimeMessageWithRetry<ChatTexDownloadCompilerJobResponse>(
+          {
+            type: CHATTEX_DOWNLOAD_COMPILER_JOB,
+            jobId: job.jobId,
+          },
+        );
+      if (!downloadResponse.ok) {
         throw new Error(
-          downloadResponse?.error || "Download packaging failed.",
+          downloadResponse.error || "Download packaging failed.",
         );
       }
 
@@ -301,6 +339,32 @@ function readProtocol(value: string): string {
     return new URL(value).protocol;
   } catch {
     return "";
+  }
+}
+
+function describeCompilerJob(
+  job: import("@/src/features/compiler/compiler-job-types").CompilerJobSnapshot,
+): string {
+  const progress = job.progress;
+  switch (job.phase) {
+    case "downloading-compiler":
+      return progress?.phase === "downloading-compiler"
+        ? `2/3 Downloading XeTeX: ${Math.round(
+            (progress.loaded / Math.max(progress.total, 1)) * 100,
+          )}% — ${progress.label}`
+        : "2/3 Downloading verified XeTeX core…";
+    case "downloading-packages":
+      return progress?.phase === "downloading-packages"
+        ? `2/3 Downloading package ${progress.current}/${progress.total}: ${progress.label}`
+        : "2/3 Downloading required TeX packages…";
+    case "initializing":
+      return "2/3 Initializing isolated XeTeX…";
+    case "compiling":
+      return progress?.phase === "compiling"
+        ? `2/3 Compiling XeTeX pass ${progress.pass}…`
+        : "2/3 Compiling XeTeX PDF…";
+    default:
+      return "2/3 Preparing compiler job…";
   }
 }
 

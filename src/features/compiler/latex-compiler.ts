@@ -11,23 +11,56 @@ import {
   isGraphicsRelatedFailure,
   readCompileLog,
 } from "./compile-diagnostics";
+import { SandboxCompilerCrashError } from "./sandbox-compiler-client";
 
 export class LatexCompiler {
   private initializePromise: Promise<void> | null = null;
 
   constructor(private readonly engine: LatexEngine) {}
 
-  async compile(project: LatexCompileProject): Promise<LatexCompileOutput> {
-    await this.ensureInitialized();
+  async compile(
+    project: LatexCompileProject,
+    signal?: AbortSignal,
+  ): Promise<LatexCompileOutput> {
+    for (let crashAttempt = 0; crashAttempt < 2; crashAttempt += 1) {
+      try {
+        return await this.compileWithImageFallback(project, signal);
+      } catch (error) {
+        if (
+          crashAttempt > 0 ||
+          !(error instanceof SandboxCompilerCrashError) ||
+          signal?.aborted ||
+          !this.engine.restartAfterCrash
+        ) {
+          throw error;
+        }
+        this.engine.restartAfterCrash();
+        this.initializePromise = null;
+      }
+    }
 
+    throw new Error("Unreachable compiler retry state.");
+  }
+
+  private async compileWithImageFallback(
+    project: LatexCompileProject,
+    signal?: AbortSignal,
+  ): Promise<LatexCompileOutput> {
+    await this.ensureInitialized(signal);
     try {
-      const result = await this.engine.compile(project);
+      const result = await this.engine.compile(project, signal);
 
       return {
         ...result,
         omittedFiles: [],
       };
     } catch (firstError) {
+      if (
+        firstError instanceof SandboxCompilerCrashError ||
+        isAbortError(firstError)
+      ) {
+        throw firstError;
+      }
       if (project.files.length === 0) {
         throw firstError;
       }
@@ -53,11 +86,16 @@ export class LatexCompiler {
       const omittedSet = new Set(omittedFiles);
 
       try {
-        const fallback = await this.engine.compile({
-          ...project,
+        const fallback = await this.engine.compile(
+          {
+            ...project,
 
-          files: project.files.filter((file) => !omittedSet.has(file.path)),
-        });
+            files: project.files.filter(
+              (file) => !omittedSet.has(file.path),
+            ),
+          },
+          signal,
+        );
 
         return {
           ...fallback,
@@ -67,6 +105,12 @@ export class LatexCompiler {
           omittedFiles,
         };
       } catch (fallbackError) {
+        if (
+          fallbackError instanceof SandboxCompilerCrashError ||
+          isAbortError(fallbackError)
+        ) {
+          throw fallbackError;
+        }
         throw new FallbackCompileError(
           fallbackError instanceof Error
             ? fallbackError.message
@@ -83,14 +127,24 @@ export class LatexCompiler {
     this.initializePromise = null;
   }
 
-  private ensureInitialized(): Promise<void> {
+  private ensureInitialized(signal?: AbortSignal): Promise<void> {
     if (!this.initializePromise) {
-      this.initializePromise = this.engine.initialize().catch((error) => {
-        this.initializePromise = null;
-        throw error;
-      });
+      this.initializePromise = this.engine
+        .initialize(signal)
+        .catch((error) => {
+          this.initializePromise = null;
+          throw error;
+        });
     }
 
     return this.initializePromise;
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof DOMException
+      ? error.name === "AbortError"
+      : error instanceof Error && error.name === "AbortError"
+  );
 }

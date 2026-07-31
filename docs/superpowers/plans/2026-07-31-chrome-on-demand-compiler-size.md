@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the 503 MB bundled Chrome extension with a Chrome 116+ package no larger than 5 MiB that downloads, isolates, verifies, and caches an XeTeX-only compiler on demand.
+**Goal:** Replace the 503 MB bundled Chrome extension with a Chrome 116+ package no larger than 5 MiB that downloads, isolates, verifies, and caches the official BusyTeX runtime on demand while exposing only XeTeX compilation.
 
 **Architecture:** The offscreen document owns a persistent compiler job coordinator, verified asset cache, and restricted TeX Live fetch proxy. It transfers pinned BusyTeX core bytes into a manifest-declared sandbox; the sandbox runs a Blob-backed worker, records synchronous TeX Live misses, and retries compilation after the coordinator supplies cached or HTTPS-fetched files. Popup and in-page export clients reconnect to job snapshots rather than owning long-running compilation state.
 
-**Tech Stack:** TypeScript 5.9, WXT 0.20 Chrome MV3, React 19, Chrome offscreen documents and `storage.session`, Cache Storage, Web Crypto SHA-256, BusyTeX/TeX Live 2026, `texlyre-busytex@1.2.3`, JSZip, Vitest 4, Node 22 release tooling.
+**Tech Stack:** TypeScript 5.9, WXT 0.20 Chrome MV3, Preact 10, Chrome offscreen documents, Runtime API, `storage.session`, Cache Storage, Web Crypto SHA-256, BusyTeX/TeX Live 2026 assets derived from `texlyre-busytex@1.2.3`, JSZip, Vitest 4, Node 22 release tooling.
 
 ## Global Constraints
 
@@ -20,7 +20,10 @@
 - The default total compiler cache budget is 300 MiB.
 - Request `unlimitedStorage`, call `navigator.storage.persist()`, and check
   `navigator.storage.estimate()` before staging a compiler upgrade.
-- Use only `texlyre-busytex@1.2.3` and `engineMode: "xetex"` assets; do not ship pdfTeX, LuaTeX, or the combined engine.
+- Use only the official `texlyre-busytex@1.2.3` release assets. That release
+  publishes one combined engine binary, so accept `busytex.js`/`busytex.wasm`
+  but hardcode `xetex_bibtex8_dvipdfmx`, keep `engineMode: "xetex"`, and expose
+  no pdfTeX/LuaTeX selection in the protocol or UI.
 - Pin every core asset by exact byte length and SHA-256.
 - Trust a TeX Live file only after the first HTTPS response from `https://texlive2026.texlyre.org` has been size-limited and hashed; retain that hash after byte eviction and reject later mismatches.
 - Allow TeX Live formats `3`, `4`, `6`, `7`, `10`, `11`, `26`, `32`, `33`, `35`, `39`, `43`, `44`, and `46`.
@@ -118,8 +121,8 @@ SHA-256: 96dbacb42037472827f2f481d3bc0f44cc2f4a532abcc019dc2f407805a307f4
 export type CoreAssetId =
   | "busytex-worker"
   | "busytex-pipeline"
-  | "xetex-js"
-  | "xetex-wasm"
+  | "busytex-js"
+  | "busytex-wasm"
   | "texlive-basic-js"
   | "texlive-basic-data";
 
@@ -163,12 +166,12 @@ import {
 } from "../../scripts/prepare-compiler-assets.mjs";
 
 describe("prepare-compiler-assets", () => {
-  it("selects only the XeTeX/basic runtime", () => {
+  it("selects only the released BusyTeX/basic runtime", () => {
     const selected = selectCoreArchiveEntries([
       "busytex/busytex_worker.js",
       "busytex/busytex_pipeline.js",
-      "busytex/xetex.js",
-      "busytex/xetex.wasm",
+      "busytex/busytex.js",
+      "busytex/busytex.wasm",
       "busytex/pdftex.wasm",
       "busytex/luahbtex.wasm",
       "busytex/texlive-basic.js",
@@ -185,16 +188,16 @@ describe("prepare-compiler-assets", () => {
   it("writes lowercase 64-character hashes and exact sizes", () => {
     const manifest = createGeneratedManifest([
       {
-        id: "xetex-wasm",
-        filename: "xetex.wasm",
+        id: "busytex-wasm",
+        filename: "busytex.wasm",
         bytes: new Uint8Array([1, 2, 3]),
         mimeType: "application/wasm",
       },
     ]);
 
     expect(manifest[0]).toMatchObject({
-      id: "xetex-wasm",
-      filename: "xetex.wasm",
+      id: "busytex-wasm",
+      filename: "busytex.wasm",
       byteLength: 3,
       mimeType: "application/wasm",
     });
@@ -227,8 +230,8 @@ export const UPSTREAM_ARCHIVE = Object.freeze({
 export const EXPECTED_CORE_FILES = Object.freeze([
   "busytex_worker.js",
   "busytex_pipeline.js",
-  "xetex.js",
-  "xetex.wasm",
+  "busytex.js",
+  "busytex.wasm",
   "texlive-basic.js",
   "texlive-basic.data",
 ]);
@@ -285,8 +288,10 @@ pnpm run compiler:prepare
 du -ch .compiler-assets/1.2.3/* | tail -1
 ```
 
-Expected: tests PASS; all six files exist; total is at most `140M`; no
-pdfTeX, LuaTeX, recommended, or extra file exists in the output directory.
+Expected: tests PASS; all six files exist; their exact total is `125645625`
+bytes and is at most `140M`; no recommended or extra TeX Live data file exists
+in the output directory. The released combined engine is permitted only
+because the runtime protocol remains locked to XeTeX.
 
 - [ ] **Step 6: Run the no-commit checkpoint**
 
@@ -546,10 +551,20 @@ At startup call `browser.storage.local.setAccessLevel({
 accessLevel: "TRUSTED_CONTEXTS" })` before reading metadata, so content
 scripts cannot access compiler-cache metadata directly.
 
-Store bytes under synthetic extension URLs returned by
-`browser.runtime.getURL(`/__compiler_cache__/${encodeURIComponent(key)}`)`.
-`Cache.put()` is the atomic visibility boundary: write bytes first, then write
-metadata. A metadata record without bytes is treated as a miss and repaired.
+Chrome exposes only the Runtime extension API inside offscreen documents.
+Access `storage.local` through a sender-validated Runtime RPC handled by the
+background service worker; do not dereference `browser.storage` in the
+offscreen document.
+
+Store bytes under synthetic HTTPS request keys:
+`https://chatgpt.com/__chat2tex_compiler_cache__/${encodeURIComponent(key)}`.
+This is an inert Cache Storage request key only; the cache API never sends it
+to the network. Keeping it distinct leaves `https://chat2tex.invalid`
+exclusive to the sandbox package lookup shim.
+Chrome rejects `chrome-extension:` requests passed to `Cache.put()`, while the
+fixed HTTPS URL is only an in-cache key and is never fetched. `Cache.put()` is
+the atomic visibility boundary: write bytes first, then write metadata. A
+metadata record without bytes is treated as a miss and repaired.
 
 - [ ] **Step 5: Implement the fetcher and cache**
 
@@ -626,8 +641,8 @@ unstaged.
 - Create: `src/features/compiler/sandbox-protocol.ts`
 - Create: `src/features/compiler/sandbox-worker-source.ts`
 - Create: `src/features/compiler/sandbox-compiler-client.ts`
-- Create: `entrypoints/compiler.sandbox/index.html`
-- Create: `entrypoints/compiler.sandbox/main.ts`
+- Create: `entrypoints/compiler-sandbox.sandbox/index.html`
+- Create: `entrypoints/compiler-sandbox.sandbox/main.ts`
 - Create: `tests/features/compiler/sandbox-protocol.test.ts`
 - Create: `tests/features/compiler/sandbox-worker-source.test.ts`
 - Create: `tests/features/compiler/sandbox-compiler-client.test.ts`
@@ -764,8 +779,9 @@ Expected: FAIL because the sandbox modules do not exist.
 
 - [ ] **Step 3: Implement the WXT sandbox entrypoint and CSP**
 
-Use `entrypoints/compiler.sandbox/index.html` so WXT automatically writes
-`sandbox.pages`. Its body contains only:
+Use `entrypoints/compiler-sandbox.sandbox/index.html` so WXT automatically
+writes `sandbox.pages` without colliding with the existing `compiler`
+offscreen entrypoint. Its body contains only:
 
 ```html
 <!doctype html>
@@ -832,8 +848,8 @@ sends the upstream initialization payload with:
 
 ```ts
 {
-  busytex_js: xetexJsBlobUrl,
-  busytex_wasm: xetexWasmBlobUrl,
+  busytex_js: busytexJsBlobUrl,
+  busytex_wasm: busytexWasmBlobUrl,
   preload_data_packages_js: [texliveBasicJsBlobUrl],
   data_packages_js: [texliveBasicJsBlobUrl],
   texmf_local: [],
@@ -854,8 +870,8 @@ Create Blob URLs with these MIME types:
 {
   "busytex-worker": "text/javascript",
   "busytex-pipeline": "text/javascript",
-  "xetex-js": "text/javascript",
-  "xetex-wasm": "application/wasm",
+  "busytex-js": "text/javascript",
+  "busytex-wasm": "application/wasm",
   "texlive-basic-js": "text/javascript",
   "texlive-basic-data": "application/octet-stream",
 }
@@ -887,11 +903,22 @@ python3 -m http.server 4178 --bind 127.0.0.1 \
   --directory .compiler-assets/1.2.3
 ```
 
-In another terminal run:
+Build a static development-mode bundle:
 
 ```bash
-WXT_COMPILER_ASSET_BASE_URL=http://127.0.0.1:4178/ pnpm dev
+WXT_COMPILER_ASSET_BASE_URL=http://127.0.0.1:4178/ \
+  pnpm exec wxt build --mode development
+pnpm exec web-ext run \
+  --source-dir .output/chrome-mv3-dev \
+  --target chromium \
+  --no-reload \
+  --no-input
 ```
+
+Do not use WXT's live sandbox HTML for this gate: WXT 0.20 injects
+cross-origin Vite module scripts without CORS headers, so the sandbox module
+is fetched but cannot execute. The static development-mode build preserves
+the development core URL and CSP while matching production bundling.
 
 Load the unpacked extension in Chrome 116+ and invoke the temporary
 development-only offscreen smoke request first with:
@@ -1387,6 +1414,10 @@ full sanitized `CompilerJobSnapshot`. Use `browser.storage.local` key
 Keep `StartCompilerJobPayload`, title/URL recovery data, PDF bytes, source
 files, artifact object URLs, and logs in offscreen memory. Set both storage
 areas to `"TRUSTED_CONTEXTS"` before the first read/write.
+
+The offscreen document reaches both storage areas through the same
+sender-validated Runtime RPC because Chrome does not expose `chrome.storage`
+there.
 
 On offscreen startup:
 
@@ -2016,7 +2047,7 @@ it("rejects TeX data and WASM in the extension archive", async () => {
   const zip = new JSZip();
   zip.file("manifest.json", JSON.stringify(validManifest));
   zip.file("texlive-basic.data", new Uint8Array([1]));
-  zip.file("xetex.wasm", new Uint8Array([1]));
+  zip.file("busytex.wasm", new Uint8Array([1]));
 
   await expect(inspectExtensionBytes(await zip.generateAsync({
     type: "uint8array",

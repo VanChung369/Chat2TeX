@@ -18,11 +18,16 @@ export interface LatexCompileOutput extends LatexEngineOutput {
 }
 
 export interface LatexEngine {
-  initialize(): Promise<void>;
+  initialize(signal?: AbortSignal): Promise<void>;
 
-  compile(project: LatexCompileProject): Promise<LatexEngineOutput>;
+  compile(
+    project: LatexCompileProject,
+    signal?: AbortSignal,
+  ): Promise<LatexEngineOutput>;
 
   terminate(): void;
+
+  restartAfterCrash?(): void;
 }
 
 export interface SerializedCompilerFile {
