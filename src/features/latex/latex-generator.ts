@@ -138,6 +138,7 @@ export class LatexGenerator {
         fontFamily,
         paperSize,
         authorLabel,
+        document.title || "Untitled conversation",
       ),
       "",
       "\\begin{document}",
@@ -164,6 +165,7 @@ export class LatexGenerator {
     fontFamily: LatexFontFamily = "default",
     paperSize: LatexPaperSize = "a4",
     authorLabel?: string,
+    documentTitle = "Untitled conversation",
   ): string {
     const paperSpec =
       paperSize === "letter"
@@ -195,7 +197,9 @@ export class LatexGenerator {
             ? ["\\renewcommand{\\familydefault}{\\ttdefault}"]
             : [];
 
-    const isDark = paperColor === "dark" || (paperColor === "default" && templateId === "dark-mode");
+    const isDark =
+      paperColor === "dark" ||
+      (paperColor === "default" && templateId === "dark-mode");
 
     const colors = isDark
       ? [
@@ -348,6 +352,7 @@ export class LatexGenerator {
       ...fontOverrides,
       "\\usepackage{amsmath}",
       "\\usepackage{amssymb}",
+      "\\IfFileExists{mathtools.sty}{\\usepackage{mathtools}}{}",
       "\\usepackage{graphicx}",
       "\\usepackage[export]{adjustbox}",
       "\\usepackage{longtable}",
@@ -368,7 +373,10 @@ export class LatexGenerator {
       "  colorlinks=true,",
       "  linkcolor=bookaccent,",
       "  urlcolor=bookaccent,",
-      "  citecolor=bookaccent",
+      "  citecolor=bookaccent,",
+      `  pdftitle={${escapeNormalizedText(documentTitle)}},`,
+      `  pdfauthor={${authorLabel ?? escapeNormalizedText(labels.attribution)}},`,
+      "  pdfproducer={Chat2TeX}",
       "}",
       "",
       "\\AtBeginDocument{\\pagecolor{bookpaper}\\color{bookink}}",
@@ -381,6 +389,8 @@ export class LatexGenerator {
       "\\clubpenalty=10000",
       "\\widowpenalty=10000",
       "\\displaywidowpenalty=10000",
+      "\\hyphenpenalty=100",
+      "\\exhyphenpenalty=50",
       "\\emergencystretch=2em",
       "\\setcounter{tocdepth}{2}",
       "\\setcounter{secnumdepth}{3}",
@@ -765,9 +775,7 @@ export class LatexGenerator {
       case "table":
         return block.rows
           .flatMap((row) =>
-            row.cells.map((cell) =>
-              this.renderRawInlineNodes(cell.children),
-            ),
+            row.cells.map((cell) => this.renderRawInlineNodes(cell.children)),
           )
           .join(" ");
 
@@ -811,10 +819,7 @@ export class LatexGenerator {
     }
   }
 
-  private renderBlock(
-    block: BlockNode,
-    context: BlockRenderContext,
-  ): string {
+  private renderBlock(block: BlockNode, context: BlockRenderContext): string {
     switch (block.type) {
       case "paragraph":
         return this.renderInlineNodes(block.children);
@@ -923,8 +928,7 @@ export class LatexGenerator {
       return `\\textbf{${content}}`;
     }
 
-    const canBeNumbered =
-      context.numberedHeadings && normalizedLevel <= 3;
+    const canBeNumbered = context.numberedHeadings && normalizedLevel <= 3;
 
     return canBeNumbered
       ? `\\${command}[${plainContent}]{${content}}`
@@ -1003,10 +1007,7 @@ export class LatexGenerator {
       .join("\n");
   }
 
-  private renderList(
-    block: ListBlock,
-    context: BlockRenderContext,
-  ): string {
+  private renderList(block: ListBlock, context: BlockRenderContext): string {
     const environment = block.ordered ? "enumerate" : "itemize";
 
     const startOption =
@@ -1058,8 +1059,7 @@ export class LatexGenerator {
     const firstRow = block.rows[0];
 
     const hasHeader =
-      firstRow.cells.length > 0 &&
-      firstRow.cells.every((cell) => cell.header);
+      firstRow.cells.length > 0 && firstRow.cells.every((cell) => cell.header);
 
     const header = hasHeader ? renderedRows[0] : null;
 
@@ -1188,9 +1188,7 @@ export class LatexGenerator {
   private renderBlockImage(sourceUrl: string, alt: string): string {
     const asset = this.registerImage(sourceUrl, alt);
 
-    const safeAlt = escapeNormalizedText(
-      alt.trim() || "Image unavailable",
-    );
+    const safeAlt = escapeNormalizedText(alt.trim() || "Image unavailable");
     const caption = alt.trim()
       ? `{\\small\\itshape\\color{bookmuted}${escapeNormalizedText(
           alt.trim(),
@@ -1395,9 +1393,7 @@ function inferCodeLanguage(code: string): string | null {
     return "sql";
   }
 
-  if (
-    /^[^{]+\{[\s\S]*[\w-]+\s*:\s*[^;{}]+;?[\s\S]*\}$/u.test(normalized)
-  ) {
+  if (/^[^{]+\{[\s\S]*[\w-]+\s*:\s*[^;{}]+;?[\s\S]*\}$/u.test(normalized)) {
     return "css";
   }
 
@@ -1444,9 +1440,7 @@ function looksLikeJson(value: string): boolean {
   }
 }
 
-function detectDocumentLanguage(
-  document: ChatDocumentAst,
-): DocumentLanguage {
+function detectDocumentLanguage(document: ChatDocumentAst): DocumentLanguage {
   return VIETNAMESE_CHARACTER_PATTERN.test(
     JSON.stringify(document).normalize("NFC"),
   )

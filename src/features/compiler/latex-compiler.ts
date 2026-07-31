@@ -8,6 +8,7 @@ import {
   combineCompileLogs,
   FallbackCompileError,
   findFailingProjectPaths,
+  isGraphicsRelatedFailure,
   readCompileLog,
 } from "./compile-diagnostics";
 
@@ -38,6 +39,12 @@ export class LatexCompiler {
         project.files.map((file) => file.path),
       );
 
+      // Only drop every asset as a last resort when the failure looks
+      // graphics-related; otherwise a text error would needlessly strip images.
+      if (mentionedPaths.length === 0 && !isGraphicsRelatedFailure(firstLog)) {
+        throw firstError;
+      }
+
       const omittedFiles =
         mentionedPaths.length > 0
           ? mentionedPaths
@@ -49,9 +56,7 @@ export class LatexCompiler {
         const fallback = await this.engine.compile({
           ...project,
 
-          files: project.files.filter(
-            (file) => !omittedSet.has(file.path),
-          ),
+          files: project.files.filter((file) => !omittedSet.has(file.path)),
         });
 
         return {

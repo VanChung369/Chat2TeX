@@ -26,6 +26,13 @@ export function findFailingProjectPaths(
   return projectPaths.filter((path) => diagnosticText.includes(path));
 }
 
+const GRAPHICS_FAILURE_PATTERN =
+  /(includegraphics|graphic|image|xdvipdfmx|\.png|\.jpe?g|\.pdf\b|\.bmp\b|\.gif\b|\.webp\b|\.svg\b|unable to load picture|division by zero|dimension too large|cannot determine size|unknown graphics extension)/i;
+
+export function isGraphicsRelatedFailure(log: string): boolean {
+  return GRAPHICS_FAILURE_PATTERN.test(log);
+}
+
 export function extractCompileDiagnostic(log: string): string | null {
   const lines = log.split(/\r?\n/).map((line) => line.trim());
 

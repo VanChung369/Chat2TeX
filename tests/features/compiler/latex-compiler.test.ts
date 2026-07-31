@@ -162,7 +162,10 @@ describe("LatexCompiler", () => {
 
     vi.mocked(engine.compile)
       .mockRejectedValueOnce(
-        createCompileError("Initial compilation failed.", "Initial log"),
+        createCompileError(
+          "Initial compilation failed.",
+          "Initial log: includegraphics error",
+        ),
       )
       .mockRejectedValueOnce(
         createCompileError("Fallback compilation failed.", "Fallback log"),
@@ -184,5 +187,34 @@ describe("LatexCompiler", () => {
       message: "Fallback compilation failed.",
       compileLog: expect.stringContaining("Initial log"),
     });
+  });
+
+  it("does not drop images when the failure is unrelated to graphics", async () => {
+    const engine = createEngine();
+
+    vi.mocked(engine.compile).mockRejectedValueOnce(
+      createCompileError(
+        "Initial compilation failed.",
+        "! Undefined control sequence.\nl.42 \\badcommand",
+      ),
+    );
+
+    const compiler = new LatexCompiler(engine);
+
+    await expect(
+      compiler.compile({
+        source: "\\badcommand",
+        files: [
+          {
+            path: "assets/image-001.png",
+            content: new Uint8Array([1]),
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      message: "Initial compilation failed.",
+    });
+
+    expect(engine.compile).toHaveBeenCalledTimes(1);
   });
 });
