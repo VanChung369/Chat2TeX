@@ -110,6 +110,8 @@ The manifest retains only permissions used by the application:
 - `downloads`;
 - `offscreen`;
 - `storage`.
+- `unlimitedStorage`, because the 140 MiB core and 300 MiB cache use Cache
+  Storage and must not be subject to normal origin quota eviction.
 
 The unused `scripting` permission is removed. Existing optional HTTPS host
 permission remains user-triggered for conversation images that require it.
@@ -151,7 +153,11 @@ so service-worker suspension does not terminate an active export.
 The compiler runs inside a page listed in the manifest's `sandbox.pages`.
 That page has a unique origin and no access to `chrome.*` APIs. Its CSP permits
 the local bootstrap, Blob-backed workers, and WebAssembly execution, but sets
-direct network access to `connect-src 'none'`.
+`connect-src blob:` so Emscripten can read transferred WASM/data Blob URLs
+while every HTTP, HTTPS, WebSocket, and other network destination remains
+blocked. `default-src 'none'` plus explicit `img-src`, `media-src`, `font-src`,
+`style-src`, `frame-src`, and `form-action` restrictions close non-fetch
+exfiltration paths as well.
 
 The coordinator transfers verified asset bytes to the sandbox. A
 `SandboxAssetAdapter` creates sandbox-origin Blob URLs and maps BusyTeX's
@@ -167,9 +173,21 @@ The runtime uses `texlyre-busytex@1.2.3` with:
 - shell escape disabled;
 - no remote shell-handler scripts.
 
-The sandbox cannot fetch the endpoint directly. A restricted request proxy
-accepts only exact asset or TeX Live lookup messages, performs validation in
-the coordinator, returns bytes, and exposes no general HTTP method.
+The sandbox cannot fetch the endpoint directly. A worker shim intercepts
+BusyTeX's synchronous remote-file lookup, records the requested format and
+filename, and returns a local miss. After that compile pass ends, the sandbox
+sends the recorded lookups to the coordinator. The coordinator downloads and
+caches valid files, the sandbox writes them into BusyTeX's virtual filesystem,
+and compilation retries. The cycle stops when compilation succeeds, no new
+lookup exists, or 32 package-resolution passes have run.
+
+The restricted request proxy accepts only the TeX Live format identifiers
+`3`, `4`, `6`, `7`, `10`, `11`, `26`, `32`, `33`, `35`, `39`, `43`, `44`,
+and `46`, plus filenames matching `[A-Za-z0-9._-]{1,255}`. It exposes no
+general HTTP method, arbitrary path, query string, request body, or
+user-controlled origin. One pass may report at most 256 unique lookups; one
+job may resolve at most 512 unique files and download at most 160 MiB of
+on-demand package bytes.
 
 ### Asset distribution and integrity
 
@@ -193,13 +211,19 @@ The extension packages a small root manifest containing:
 - TeX Live year;
 - immutable base URLs;
 - expected size and SHA-256 for every core asset;
-- URL, size, and SHA-256 for the remote package catalog.
+- the fixed TeX Live package endpoint;
+- the permitted format identifiers and maximum package-file size.
 
-The package catalog is downloaded as data and accepted only when its SHA-256
-matches the root manifest. Each catalog entry maps an allowed TeX lookup to an
-immutable URL, maximum size, and SHA-256. No remote manifest may change the
-asset origin, introduce a new executable category, or relax the request
-allowlist without an extension update.
+The TeXlyre endpoint does not publish a versioned digest catalog for its
+individual files. On-demand files therefore use trust on first use: the first
+HTTPS response from the fixed endpoint is size-limited, hashed with SHA-256,
+and stored with its format/filename key. The hash ledger remains after
+least-recently-used byte eviction. Every later download for the same compiler
+version must match the first-seen hash or fail with an integrity error. A full
+cache reset deliberately clears both package bytes and this local hash ledger.
+
+No remote manifest may change the asset origin, introduce a new executable
+category, or relax the request allowlist without an extension update.
 
 The default package endpoint is
 `https://texlive2026.texlyre.org`. The endpoint receives ordinary static file
@@ -212,13 +236,16 @@ The coordinator stores bytes in the extension origin, not in the sandbox.
 Core assets are keyed by compiler version and content hash. Package entries
 are keyed by TeX Live version, canonical lookup path, and content hash.
 
-Every cache read verifies metadata and byte length. A first download also
-verifies SHA-256 before the entry becomes visible to compilation. Partially
-downloaded or unverified entries are never reused.
+Every cache read verifies metadata and byte length. Core downloads must match
+the root manifest's SHA-256. On-demand package downloads must establish or
+match their trust-on-first-use SHA-256 ledger entry before becoming visible to
+compilation. Partially downloaded or unverified entries are never reused.
 
 Core assets are not evicted during ordinary cleanup. Optional packages use
 least-recently-used eviction. The default total cache budget is 300 MiB, while
-the first-use core cache limit is 140 MiB. The settings
+the first-use core cache limit is 140 MiB. The extension requests
+`unlimitedStorage`, checks `navigator.storage.estimate()` before staging a new
+core, and calls `navigator.storage.persist()` as defense in depth. The settings
 UI provides:
 
 - current compiler-cache size;
@@ -236,19 +263,25 @@ actionable storage message instead of deleting the working version first.
    service worker.
 2. The background assigns a `jobId`, ensures the offscreen document exists,
    and forwards the request.
-3. The coordinator records job metadata in `chrome.storage.session` and keeps
-   source and binary payloads only in offscreen memory.
+3. The coordinator records the reconnectable snapshot in
+   `chrome.storage.session`, writes a minimal text-free active-job recovery
+   marker to `chrome.storage.local`, and keeps source and binary payloads only
+   in offscreen memory.
 4. The coordinator loads the pinned root manifest and checks the core cache.
 5. Missing assets are downloaded, size-limited, hashed, and atomically cached.
 6. The coordinator creates the sandbox and transfers the verified assets.
 7. The sandbox initializes the XeTeX-only runner.
 8. The coordinator sends LaTeX source and project images to the sandbox.
-9. When XeTeX needs an uncached file, the restricted proxy validates the
-   canonical lookup against the catalog, returns a cached entry or downloads
-   and verifies it, then supplies it to the sandbox.
-10. The sandbox returns PDF bytes, logs, and structured diagnostics.
-11. The coordinator creates only the requested artifacts.
-12. The background downloads the resulting files and updates the terminal job
+9. When XeTeX needs an uncached file, the worker shim records the canonical
+   lookup and finishes that compile pass with a local miss.
+10. The restricted proxy validates each recorded lookup, returns a cached
+    entry or downloads it through HTTPS, establishes or verifies its local
+    hash, and supplies it to the sandbox.
+11. The sandbox writes those files into BusyTeX's virtual filesystem and
+    retries compilation, up to the 32-pass limit.
+12. The sandbox returns PDF bytes, logs, and structured diagnostics.
+13. The coordinator creates only the requested artifacts.
+14. The background downloads the resulting files and updates the terminal job
     state.
 
 Job phases are:
@@ -268,8 +301,10 @@ Progress contains completed bytes, total known bytes, and an asset or package
 label. Reopening the popup reads `chrome.storage.session` and reconnects to
 the active `jobId`. Closing the popup therefore does not cancel the job.
 Closing Chrome may terminate the offscreen document; on the next popup open,
-an unfinished session record becomes a clear `interrupted` failure rather
-than pretending the export is still running.
+the session snapshot is gone, but an unfinished local recovery marker becomes
+a generic `interrupted` failure rather than pretending the export is still
+running. The marker contains no title, source, URL, image, output, or log and
+is removed on every terminal transition.
 
 ## Output-Specific Work
 
@@ -292,10 +327,13 @@ and ZIP artifacts and filter them out afterward.
 - The sandbox has no Chrome extension APIs, extension-origin storage, DOM
   access to ChatGPT, or direct network access.
 - The coordinator never evaluates downloaded bytes.
-- Every core asset and on-demand package is size-limited and hash-verified.
-- The package proxy accepts only `GET`-equivalent lookups present in the pinned
-  catalog. It rejects traversal, query strings, fragments, alternate origins,
-  redirects outside the allowlist, request bodies, and unknown formats.
+- Every core asset is size-limited and checked against its pinned hash. Every
+  on-demand package is size-limited and checked against its local
+  trust-on-first-use hash.
+- The package proxy accepts only `GET`-equivalent lookups with an allowed
+  numeric format and safe filename. It rejects traversal, query strings,
+  fragments, alternate origins, redirects outside the allowlist, request
+  bodies, and unknown formats.
 - Source, images, compiler logs, PDF bytes, and ZIP bytes are not written to
   persistent compiler cache.
 - Errors and telemetry do not include raw source, cookies, access tokens,
@@ -334,9 +372,11 @@ additional space needed and offers cache cleanup.
 
 ### Package not found
 
-Unknown catalog entries and endpoint misses are negative-cached for the
-compiler version to avoid repeated requests. The compile result names the
-missing package or file and preserves the XeTeX log.
+Invalid lookups and endpoint 404 responses are negative-cached for the compiler
+version to avoid repeated requests. The compile result names the missing
+package or file and preserves the XeTeX log. Reaching 32 package-resolution
+passes produces a bounded-resolution error containing the final requested
+lookups.
 
 ### Cancellation
 
@@ -417,7 +457,8 @@ server to bypass this gate.
 
 ### Unit tests
 
-- manifest schema, canonical paths, origin allowlist, sizes, and hashes;
+- manifest schema, format/filename validation, origin allowlist, sizes, pinned
+  core hashes, and trust-on-first-use package hashes;
 - cache hit, miss, atomic commit, version isolation, LRU, and cleanup;
 - job state transitions, stale-message rejection, cancellation, and popup
   reconnection;
@@ -431,7 +472,10 @@ server to bypass this gate.
 - warm start performs no core network requests;
 - cached packages compile while offline;
 - an uncached required package produces the correct download and progress;
+- multiple uncached files resolve across bounded compile passes;
 - corrupted cache and corrupted download follow the one-retry policy;
+- a later package response whose hash differs from the first-seen ledger entry
+  is rejected;
 - endpoint failure preserves valid cache;
 - closing and reopening the popup reconnects to the active job;
 - compiler timeout recreates the sandbox once;
@@ -477,7 +521,7 @@ The verification sequence includes:
   non-sandbox remote-code entrypoints;
 - a compiled-bundle URL scan that rejects origins outside the documented
   allowlist;
-- a manifest assertion for Chrome 116+, sandbox CSP, and the reduced
+- a manifest assertion for Chrome 116+, sandbox CSP, and the exact minimal
   permission and origin sets.
 
 ## Acceptance Criteria
@@ -490,6 +534,7 @@ The verification sequence includes:
 - A second initialization uses the core cache without redownloading it.
 - A document using supported recommended or extra packages compiles by
   downloading only required on-demand files.
+- A first-seen package hash remains enforced after its cached bytes are evicted.
 - Previously cached documents compile without network access.
 - Closing the popup does not terminate an active export.
 - TEX/ZIP-only exports do not initialize the compiler, and PDF-only exports do
