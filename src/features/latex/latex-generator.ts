@@ -21,6 +21,7 @@ import type {
   LatexFontFamily,
   LatexGenerationResult,
   LatexPaperColor,
+  LatexPaperSize,
   LatexTemplateId,
 } from "./types";
 
@@ -76,15 +77,19 @@ export class LatexGenerator {
         ? { templateId: optionsOrTemplateId }
         : optionsOrTemplateId;
 
-    const templateId = options.templateId ?? "academic";
-    const paperColor = options.paperColor ?? "default";
-    const fontFamily = options.fontFamily ?? "default";
-
     this.assets = [];
 
     const language = detectDocumentLanguage(document);
-
     const labels = BOOK_LABELS[language];
+
+    const templateId = options.templateId ?? "academic";
+    const paperColor = options.paperColor ?? "default";
+    const fontFamily = options.fontFamily ?? "default";
+    const paperSize = options.paperSize ?? "a4";
+    const authorName = options.authorName?.trim() || "";
+    const authorLabel = authorName
+      ? escapeNormalizedText(authorName)
+      : escapeNormalizedText(labels.attribution);
 
     const includeUserMessages = options.includeUserMessages ?? true;
     const excludedSet = new Set(options.excludedMessageIds ?? []);
@@ -128,11 +133,11 @@ export class LatexGenerator {
 
     const headerContent = isBookStyle
       ? [
-          this.renderCover(document, labels),
+          this.renderCover(document, labels, authorLabel),
           "",
           this.renderContents(document),
         ].join("\n")
-      : this.renderAcademicHeader(document, labels);
+      : this.renderAcademicHeader(document, labels, authorLabel);
 
     const source = [
       this.renderPreamble(
@@ -141,6 +146,8 @@ export class LatexGenerator {
         templateId,
         paperColor,
         fontFamily,
+        paperSize,
+        authorLabel,
       ),
       "",
       "\\begin{document}",
@@ -165,13 +172,22 @@ export class LatexGenerator {
     templateId: LatexTemplateId,
     paperColor: LatexPaperColor = "default",
     fontFamily: LatexFontFamily = "default",
+    paperSize: LatexPaperSize = "a4",
+    authorLabel?: string,
   ): string {
+    const paperSpec =
+      paperSize === "letter"
+        ? "letterpaper"
+        : paperSize === "a5"
+          ? "a5paper"
+          : "a4paper";
+
     const docClass =
       templateId === "ieee-twocolumn"
-        ? "\\documentclass[10pt,twocolumn,a4paper]{article}"
+        ? `\\documentclass[10pt,twocolumn,${paperSpec}]{article}`
         : templateId === "cheatsheet"
-          ? "\\documentclass[9pt,twocolumn,a4paper]{article}"
-          : "\\documentclass[11pt,a4paper]{article}";
+          ? `\\documentclass[9pt,twocolumn,${paperSpec}]{article}`
+          : `\\documentclass[11pt,${paperSpec}]{article}`;
 
     const geometry =
       templateId === "cheatsheet"
@@ -561,15 +577,17 @@ export class LatexGenerator {
   private renderAcademicHeader(
     document: ChatDocumentAst,
     labels: BookLabels,
+    authorLabel?: string,
   ): string {
     const title = escapeNormalizedText(
       document.title || "Untitled conversation",
     );
     const sourceUrl = escapeLatexUrl(document.url);
+    const author = authorLabel || escapeNormalizedText(labels.attribution);
 
     return [
       `\\title{\\Large\\bfseries ${title}}`,
-      `\\author{\\small ${escapeNormalizedText(labels.attribution)}}`,
+      `\\author{\\small ${author}}`,
       "\\date{\\small \\today}",
       "\\maketitle",
       "\\thispagestyle{plain}",
@@ -585,12 +603,14 @@ export class LatexGenerator {
   private renderCover(
     document: ChatDocumentAst,
     labels: BookLabels,
+    authorLabel?: string,
   ): string {
     const title = escapeNormalizedText(
       document.title || "Untitled conversation",
     );
 
     const sourceUrl = escapeLatexUrl(document.url);
+    const author = authorLabel || escapeNormalizedText(labels.attribution);
 
     return [
       "\\begin{titlepage}",
@@ -610,7 +630,7 @@ export class LatexGenerator {
       "\\par\\vspace{3mm}",
       "{\\sffamily\\footnotesize\\color{bookmuted}",
       `${escapeNormalizedText(labels.source)}: \\url{${sourceUrl}}`,
-      `\\par ${escapeNormalizedText(labels.attribution)}}`,
+      `\\par ${author}}`,
       "\\end{titlepage}",
     ].join("\n");
   }

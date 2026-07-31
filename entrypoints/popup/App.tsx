@@ -28,6 +28,8 @@ export default function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<import("@/src/features/latex/types").LatexTemplateId>("academic");
   const [selectedColor, setSelectedColor] = useState<import("@/src/features/latex/types").LatexPaperColor>("default");
   const [selectedFont, setSelectedFont] = useState<import("@/src/features/latex/types").LatexFontFamily>("default");
+  const [selectedPaperSize, setSelectedPaperSize] = useState<import("@/src/features/latex/types").LatexPaperSize>("a4");
+  const [authorName, setAuthorName] = useState("");
   const [exportPdfOnly, setExportPdfOnly] = useState(false);
   const [includeUserMessages, setIncludeUserMessages] = useState(true);
   const exportFlow = useExportFlow();
@@ -208,6 +210,35 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="options-row">
+                <div>
+                  <span className="options-card__label">4. Khổ Giấy</span>
+                  <select
+                    id="app-size-select"
+                    className="options-select"
+                    value={selectedPaperSize}
+                    onChange={(e) => setSelectedPaperSize(e.target.value as import("@/src/features/latex/types").LatexPaperSize)}
+                  >
+                    <option value="a4">📄 Khổ A4</option>
+                    <option value="letter">📑 Khổ Letter</option>
+                    <option value="a5">📖 Khổ A5 (Kindle)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <span className="options-card__label">5. Tác Giả / Watermark</span>
+                  <input
+                    type="text"
+                    id="app-author-input"
+                    className="options-select"
+                    placeholder="Tùy chọn..."
+                    value={authorName}
+                    onChange={(e) => setAuthorName(e.target.value)}
+                    style={{ cursor: "text" }}
+                  />
+                </div>
+              </div>
+
               <div className="toggle-group">
                 <label className="toggle-item" htmlFor="app-user-check">
                   <span className="toggle-item__label">Kèm câu hỏi của User</span>
@@ -271,6 +302,8 @@ export default function App() {
                     templateId: selectedTemplate,
                     paperColor: selectedColor,
                     fontFamily: selectedFont,
+                    paperSize: selectedPaperSize,
+                    authorName,
                     exportPdfOnly,
                     includeUserMessages,
                   });
@@ -424,6 +457,8 @@ export default function App() {
                     templateId: selectedTemplate,
                     paperColor: selectedColor,
                     fontFamily: selectedFont,
+                    paperSize: selectedPaperSize,
+                    authorName,
                     exportPdfOnly,
                     includeUserMessages,
                   }); }}
@@ -449,6 +484,8 @@ export default function App() {
                     templateId: selectedTemplate,
                     paperColor: selectedColor,
                     fontFamily: selectedFont,
+                    paperSize: selectedPaperSize,
+                    authorName,
                     exportPdfOnly,
                     includeUserMessages,
                   }); }}

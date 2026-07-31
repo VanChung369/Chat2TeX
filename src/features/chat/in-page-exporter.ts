@@ -277,6 +277,8 @@ export class InPageExporterUI {
   private selectedTemplate: LatexTemplateId = "academic";
   private selectedColor: LatexPaperColor = "default";
   private selectedFont: LatexFontFamily = "default";
+  private selectedPaperSize: import("@/src/features/latex/types").LatexPaperSize = "a4";
+  private authorName = "";
   private exportPdfOnly = false;
   private includeUserMessages = true;
   private excludedMessageIds = new Set<string>();
@@ -370,6 +372,21 @@ export class InPageExporterUI {
           </div>
         </div>
 
+        <div class="c2t-row">
+          <div>
+            <span class="c2t-field-label">4. Khổ Giấy</span>
+            <select id="chat2tex-size-select" class="c2t-select">
+              <option value="a4">📄 Khổ A4</option>
+              <option value="letter">📑 Khổ Letter</option>
+              <option value="a5">📖 Khổ A5 (Kindle)</option>
+            </select>
+          </div>
+          <div>
+            <span class="c2t-field-label">5. Tác Giả / Watermark</span>
+            <input type="text" id="chat2tex-author-input" class="c2t-select" placeholder="Tùy chọn..." style="cursor:text;" />
+          </div>
+        </div>
+
         <div class="c2t-toggle-group">
           <label class="c2t-toggle" for="chat2tex-user-check">
             <span class="c2t-toggle-label">Kèm câu hỏi của User</span>
@@ -435,6 +452,18 @@ export class InPageExporterUI {
     if (fontEl) {
       fontEl.value = this.selectedFont;
       fontEl.onchange = () => { this.selectedFont = fontEl.value as LatexFontFamily; };
+    }
+    // Size
+    const sizeEl = panel.querySelector<HTMLSelectElement>("#chat2tex-size-select");
+    if (sizeEl) {
+      sizeEl.value = this.selectedPaperSize;
+      sizeEl.onchange = () => { this.selectedPaperSize = sizeEl.value as import("@/src/features/latex/types").LatexPaperSize; };
+    }
+    // Author
+    const authorEl = panel.querySelector<HTMLInputElement>("#chat2tex-author-input");
+    if (authorEl) {
+      authorEl.value = this.authorName;
+      authorEl.oninput = () => { this.authorName = authorEl.value; };
     }
     // User messages toggle
     const userCheckEl = panel.querySelector<HTMLInputElement>("#chat2tex-user-check");
@@ -583,6 +612,8 @@ export class InPageExporterUI {
           templateId: this.selectedTemplate,
           paperColor: this.selectedColor,
           fontFamily: this.selectedFont,
+          paperSize: this.selectedPaperSize,
+          authorName: this.authorName,
           exportPdfOnly: this.exportPdfOnly,
           includeUserMessages: this.includeUserMessages,
           excludedMessageIds: Array.from(this.excludedMessageIds),

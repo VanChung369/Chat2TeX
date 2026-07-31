@@ -807,4 +807,18 @@ describe("LatexGenerator", () => {
       expect(omitted).not.toContain("Explain binary search with O(log n)");
     }
   });
+
+  it("supports custom paperSize and authorName watermark", () => {
+    const generator = new LatexGenerator();
+    const doc = createDocument();
+
+    const letterPaper = generator.generate(doc, { paperSize: "letter", authorName: "Nguyen Van A" }).source;
+    expect(letterPaper).toContain("letterpaper");
+    expect(letterPaper).toContain("Nguyen Van A");
+
+    const a5Paper = generator.generate(doc, { paperSize: "a5", authorName: "Chat2TeX User" }).source;
+    expect(a5Paper).toContain("a5paper");
+    expect(a5Paper).toContain("Chat2TeX User");
+  });
 });
+

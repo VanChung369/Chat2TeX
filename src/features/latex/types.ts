@@ -33,10 +33,14 @@ export type LatexPaperColor =
 
 export type LatexFontFamily = "default" | "serif" | "sans" | "mono";
 
+export type LatexPaperSize = "a4" | "letter" | "a5";
+
 export interface LatexExportOptions {
   templateId?: LatexTemplateId;
   paperColor?: LatexPaperColor;
   fontFamily?: LatexFontFamily;
+  paperSize?: LatexPaperSize;
+  authorName?: string;
   exportPdfOnly?: boolean;
   includeUserMessages?: boolean;
   excludedMessageIds?: string[];
