@@ -28,7 +28,12 @@ import {
 } from "@/src/shared/messages";
 
 export default defineContentScript({
-  matches: ["https://chatgpt.com/*"],
+  matches: [
+    "https://chatgpt.com/*",
+    "https://*.chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://*.openai.com/*",
+  ],
   runAt: "document_idle",
 
   main() {

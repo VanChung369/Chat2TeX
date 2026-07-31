@@ -15,6 +15,9 @@ export default defineConfig({
 
     host_permissions: [
       "https://chatgpt.com/*",
+      "https://*.chatgpt.com/*",
+      "https://chat.openai.com/*",
+      "https://*.openai.com/*",
       "https://*.gstatic.com/*",
     ],
 

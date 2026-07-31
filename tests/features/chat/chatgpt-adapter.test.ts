@@ -309,4 +309,20 @@ describe("ChatGPTAdapter", () => {
       messages.map((message: { role: string; order: number }) => message.order),
     ).toEqual([0, 1]);
   });
+
+  it("supports chatgpt.com, www.chatgpt.com, and chat.openai.com domains", () => {
+    const doc = createTestDocument("");
+    expect(
+      new ChatGPTAdapter(doc, "https://chatgpt.com/c/123").isSupportedPage(),
+    ).toBe(true);
+    expect(
+      new ChatGPTAdapter(doc, "https://www.chatgpt.com/c/123").isSupportedPage(),
+    ).toBe(true);
+    expect(
+      new ChatGPTAdapter(doc, "https://chat.openai.com/c/123").isSupportedPage(),
+    ).toBe(true);
+    expect(
+      new ChatGPTAdapter(doc, "https://example.com/c/123").isSupportedPage(),
+    ).toBe(false);
+  });
 });

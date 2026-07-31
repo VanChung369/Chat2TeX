@@ -291,16 +291,7 @@ export class HtmlToAstParser {
 
   private parseInlineNode(node: Node): InlineNode[] {
     if (node.nodeType === TEXT_NODE) {
-      const value = normalizeInlineText(node.textContent ?? "");
-
-      return value
-        ? [
-            {
-              type: "text",
-              value,
-            },
-          ]
-        : [];
+      return this.parseTextNodeWithDelimiters(node.textContent ?? "");
     }
 
     if (node.nodeType !== ELEMENT_NODE) {
@@ -432,6 +423,39 @@ export class HtmlToAstParser {
     }
 
     return extractLatexSource(element);
+  }
+
+  private parseTextNodeWithDelimiters(text: string): InlineNode[] {
+    const mathPattern = /(\\\[[\s\S]*?\\\]|\\\(.*?\\\))/g;
+    const parts = text.split(mathPattern);
+    const nodes: InlineNode[] = [];
+
+    for (const part of parts) {
+      if (!part) continue;
+
+      if (part.startsWith("\\[") && part.endsWith("\\]")) {
+        const latex = part.slice(2, -2).trim();
+        if (latex) {
+          nodes.push({ type: "inline-math", latex });
+          continue;
+        }
+      }
+
+      if (part.startsWith("\\(") && part.endsWith("\\)")) {
+        const latex = part.slice(2, -2).trim();
+        if (latex) {
+          nodes.push({ type: "inline-math", latex });
+          continue;
+        }
+      }
+
+      const normalized = normalizeInlineText(part);
+      if (normalized) {
+        nodes.push({ type: "text", value: normalized });
+      }
+    }
+
+    return nodes;
   }
 }
 

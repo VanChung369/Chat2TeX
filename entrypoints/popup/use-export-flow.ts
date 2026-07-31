@@ -153,20 +153,34 @@ export function useExportFlow() {
     setPhase("processing-assets");
 
     const files: ProcessedExportAssets["files"] = [];
-
     const failures: ProcessedExportAssets["failures"] = [];
+    const total = exportData.assets.length;
 
-    for (let index = 0; index < exportData.assets.length; index += 1) {
-      const asset = exportData.assets[index];
+    if (total === 0) {
+      setProcessedAssets({ files, failures });
+      setPhase("ready");
+      return;
+    }
 
+    let completedCount = 0;
+    setProgress({
+      current: 0,
+      total,
+      label: exportData.assets[0].alt || exportData.assets[0].id,
+    });
+
+    const results = await mapConcurrent(exportData.assets, 3, async (asset) => {
+      const result = await resolveAsset(tabId, asset);
+      completedCount += 1;
       setProgress({
-        current: index + 1,
-        total: exportData.assets.length,
+        current: completedCount,
+        total,
         label: asset.alt || asset.id,
       });
+      return { asset, result };
+    });
 
-      const result = await resolveAsset(tabId, asset);
-
+    for (const { asset, result } of results) {
       if (result.ok) {
         files.push(result.file);
       } else {
@@ -390,4 +404,23 @@ function readErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : "Unable to prepare the export.";
+}
+
+async function mapConcurrent<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let currentIndex = 0;
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (currentIndex < items.length) {
+      const index = currentIndex++;
+      results[index] = await fn(items[index], index);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
 }

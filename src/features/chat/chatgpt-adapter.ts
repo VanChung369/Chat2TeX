@@ -40,7 +40,7 @@ export class ChatGPTAdapter {
     try {
       const url = new URL(this.getCurrentUrl());
 
-      return url.hostname === "chatgpt.com";
+      return /^(?:.+\.)?(?:chatgpt\.com|openai\.com)$/i.test(url.hostname);
     } catch {
       return false;
     }

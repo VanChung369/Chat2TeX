@@ -132,7 +132,8 @@ function isTrustedSender(sender: Browser.runtime.MessageSender): boolean {
   }
 
   try {
-    return new URL(sender.tab.url).hostname === "chatgpt.com";
+    const hostname = new URL(sender.tab.url).hostname;
+    return /^(?:.+\.)?(?:chatgpt\.com|openai\.com)$/i.test(hostname);
   } catch {
     return false;
   }
