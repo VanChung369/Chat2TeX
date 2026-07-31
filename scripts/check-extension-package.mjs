@@ -85,6 +85,18 @@ export async function inspectExtensionBytes(bytes) {
       texts.set(entry, await zip.files[entry].async("string"));
     }
   }
+  for (const [entry, text] of texts) {
+    if (
+      /\.html$/i.test(entry) &&
+      /<link\b[^>]*\brel\s*=\s*["'][^"']*\bmodulepreload\b[^"']*["']/i.test(
+        text,
+      )
+    ) {
+      throw new Error(
+        `Extension HTML contains a cross-world modulepreload: ${entry}.`,
+      );
+    }
+  }
   const manifestText = texts.get("manifest.json");
   if (!manifestText) {
     throw new Error("Extension archive is missing manifest.json.");

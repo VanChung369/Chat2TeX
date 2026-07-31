@@ -11,6 +11,11 @@ export default defineConfig({
   },
   targetBrowsers: ["chrome"],
   manifestVersion: 3,
+  vite: () => ({
+    build: {
+      modulePreload: false,
+    },
+  }),
   manifest: ({ mode }) =>
     createExtensionManifest({
       mode: mode === "development" ? "development" : "production",

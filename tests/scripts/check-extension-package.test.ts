@@ -126,6 +126,19 @@ describe("extension package policy gate", () => {
     ).rejects.toThrow("forbidden remote URL");
   });
 
+  it("rejects modulepreload links that Chrome cannot reuse across extension worlds", async () => {
+    await expect(
+      inspectExtensionBytes(
+        await fixture({
+          "popup.html": [
+            '<script type="module" src="/popup.js"></script>',
+            '<link rel="modulepreload" href="/chunks/messages.js">',
+          ].join("\n"),
+        }),
+      ),
+    ).rejects.toThrow("modulepreload");
+  });
+
   it("rejects a ZIP larger than 5 MiB", async () => {
     const bytes = await fixture({
       "oversized.bin": new Uint8Array(MAX_EXTENSION_ZIP_BYTES),

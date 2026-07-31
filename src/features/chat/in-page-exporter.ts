@@ -5,6 +5,11 @@ import type {
   LatexTemplateId,
 } from "@/src/features/latex/types";
 
+import {
+  calculatePanelPlacement,
+  placeExportTrigger,
+} from "./in-page-exporter-placement";
+
 export interface ChatMessageSummary {
   id: string;
   role: "user" | "assistant";
@@ -20,42 +25,73 @@ export type InPageExportRunner = (
 
 // ── Styles injected once into <head> ─────────────────────────────────────────
 const INPAGE_STYLE = `
-#chat2tex-inpage-root * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+#chat2tex-inpage-root,
+#chat2tex-inpage-root *,
+#chat2tex-inpage-panel,
+#chat2tex-inpage-panel * {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+#chat2tex-inpage-root {
+  display: inline-flex;
+  align-items: center;
+  z-index: 999999;
+}
+#chat2tex-inpage-root[data-placement="toolbar"] {
+  position: relative;
+  margin-right: 4px;
+}
+#chat2tex-inpage-root[data-placement="fallback"] {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+}
 
 #chat2tex-inpage-trigger {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  color: #fff;
-  border: none;
-  border-radius: 28px;
-  padding: 11px 20px;
-  font-size: 13.5px;
-  font-weight: 700;
-  box-shadow: 0 4px 18px rgba(79,70,229,0.45);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #4f46e5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  letter-spacing: -0.01em;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 #chat2tex-inpage-trigger:hover {
-  transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 7px 24px rgba(79,70,229,0.55);
+  background: #f5f3ff;
+  box-shadow: 0 2px 7px rgba(79, 70, 229, 0.2);
 }
-#chat2tex-inpage-trigger:active { transform: scale(0.98); }
+#chat2tex-inpage-trigger:active { transform: scale(0.96); }
+#chat2tex-inpage-trigger:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+#chat2tex-inpage-trigger svg {
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+}
 
 #chat2tex-inpage-panel {
-  position: absolute;
-  bottom: 60px;
-  right: 0;
+  position: fixed;
   width: 380px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
   background: #fff;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
-  overflow: hidden;
+  overflow-y: auto;
   animation: c2t-slide-in 0.2s cubic-bezier(.4,0,.2,1);
+  z-index: 1000000;
 }
 @keyframes c2t-slide-in {
   from { opacity:0; transform: translateY(10px); }
@@ -273,6 +309,9 @@ function showToast(message: string): void {
 export class InPageExporterUI {
   private container: HTMLElement | null = null;
   private statusPanel: HTMLElement | null = null;
+  private placementObserver: MutationObserver | null = null;
+  private placementTimer: ReturnType<typeof setTimeout> | null = null;
+  private triggerButton: HTMLButtonElement | null = null;
   private isProcessing = false;
   private selectedTemplate: LatexTemplateId = "academic";
   private selectedColor: LatexPaperColor = "default";
@@ -285,6 +324,9 @@ export class InPageExporterUI {
   private loadedMessages: ChatMessageSummary[] = [];
   private isFetchingMessages = false;
   private isMsgListOpen = true;
+  private readonly handleViewportResize = () => {
+    this.positionOpenPanel();
+  };
 
   constructor(
     private readonly runner?: InPageExportRunner,
@@ -292,32 +334,83 @@ export class InPageExporterUI {
   ) {}
 
   mount(): void {
-    const existing = document.getElementById("chat2tex-inpage-root");
-    if (existing) {
-      existing.remove();
-    }
+    this.unmount();
+    document.getElementById("chat2tex-inpage-root")?.remove();
+    document.getElementById("chat2tex-inpage-panel")?.remove();
 
     injectStyle();
 
     const root = document.createElement("div");
     root.id = "chat2tex-inpage-root";
-    root.style.cssText = "position:fixed; bottom:20px; right:20px; z-index:999999;";
 
     const button = document.createElement("button");
     button.id = "chat2tex-inpage-trigger";
-    button.innerHTML = `<span style="font-size:16px;">📄</span> Chat2TeX Export`;
+    button.type = "button";
+    button.title = "Chat2TeX Export";
+    button.setAttribute("aria-label", "Chat2TeX Export");
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M7 3.75h6.75L18.25 8v12.25H7z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M13.5 3.75V8h4.75M9.75 12h5M9.75 15.25h5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    `;
 
     button.onclick = () => { this.togglePanel(); };
 
     root.appendChild(button);
     document.body.appendChild(root);
     this.container = root;
+    this.triggerButton = button;
+    placeExportTrigger(root, document);
+
+    this.placementObserver = new MutationObserver((records) => {
+      const belongsToChat2Tex = (node: Node): boolean =>
+        node === this.container ||
+        node === this.statusPanel ||
+        Boolean(this.container?.contains(node)) ||
+        Boolean(this.statusPanel?.contains(node));
+      if (records.every((record) => belongsToChat2Tex(record.target))) {
+        return;
+      }
+      this.scheduleTriggerPlacement();
+    });
+    this.placementObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  unmount(): void {
+    this.placementObserver?.disconnect();
+    this.placementObserver = null;
+    if (this.placementTimer) {
+      clearTimeout(this.placementTimer);
+    }
+    this.placementTimer = null;
+    window.removeEventListener("resize", this.handleViewportResize);
+    this.statusPanel?.remove();
+    this.container?.remove();
+    this.statusPanel = null;
+    this.container = null;
+    this.triggerButton = null;
+  }
+
+  private scheduleTriggerPlacement(): void {
+    if (this.placementTimer) {
+      clearTimeout(this.placementTimer);
+    }
+    this.placementTimer = setTimeout(() => {
+      this.placementTimer = null;
+      if (this.container) {
+        placeExportTrigger(this.container, document);
+      }
+      this.positionOpenPanel();
+    }, 50);
   }
 
   private togglePanel(): void {
     if (this.statusPanel) {
-      this.statusPanel.remove();
-      this.statusPanel = null;
+      this.closePanel();
     } else {
       this.createStatusPanel();
     }
@@ -427,11 +520,36 @@ export class InPageExporterUI {
       </div>
     `;
 
-    this.container?.appendChild(panel);
+    document.body.appendChild(panel);
     this.statusPanel = panel;
+    this.positionOpenPanel();
+    window.addEventListener("resize", this.handleViewportResize);
 
     this.bindControls(panel);
     void this.fetchFullMessages();
+  }
+
+  private positionOpenPanel(): void {
+    if (!this.statusPanel || !this.triggerButton) {
+      return;
+    }
+
+    const placement = calculatePanelPlacement(
+      this.triggerButton.getBoundingClientRect(),
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    Object.assign(this.statusPanel.style, {
+      left: `${placement.left}px`,
+      top: `${placement.top}px`,
+      width: `${placement.width}px`,
+      maxHeight: `${placement.maxHeight}px`,
+    });
+  }
+
+  private closePanel(): void {
+    this.statusPanel?.remove();
+    this.statusPanel = null;
+    window.removeEventListener("resize", this.handleViewportResize);
   }
 
   private bindControls(panel: HTMLElement): void {
@@ -493,7 +611,7 @@ export class InPageExporterUI {
     // Close
     const closeBtn = panel.querySelector<HTMLElement>("#chat2tex-close");
     if (closeBtn) {
-      closeBtn.onclick = () => { panel.remove(); this.statusPanel = null; };
+      closeBtn.onclick = () => { this.closePanel(); };
     }
   }
 
