@@ -120,6 +120,37 @@ describe("HtmlToAstParser", () => {
     });
   });
 
+  it("reads a code language from data attributes", () => {
+    const parser = createParser();
+
+    expect(
+      parser.parseHtml(
+        '<pre data-language="python"><code>def run(): pass</code></pre>',
+      ),
+    ).toContainEqual({
+      type: "code",
+      language: "python",
+      code: "def run(): pass",
+    });
+  });
+
+  it("reads a recognized ChatGPT code header next to the pre element", () => {
+    const parser = createParser();
+
+    expect(
+      parser.parseHtml(`
+        <div>
+          <div><span>typescript</span><button>Copy</button></div>
+          <pre><code>const value: string = "colored";</code></pre>
+        </div>
+      `),
+    ).toContainEqual({
+      type: "code",
+      language: "typescript",
+      code: 'const value: string = "colored";',
+    });
+  });
+
   it("extracts inline and display KaTeX source", () => {
     const parser = createParser();
 
@@ -183,6 +214,52 @@ describe("HtmlToAstParser", () => {
       type: "math",
       latex: "\\int_0^1 x\\,dx",
     });
+  });
+
+  it("reads block image presentation and defaults legacy images to content", () => {
+    const parser = createParser();
+
+    expect(
+      parser.parseHtml(`
+        <img
+          src="https://example.com/diagram.png"
+          alt="Architecture"
+          data-chattex-image-presentation="content"
+        />
+        <img
+          src="https://www.google.com/s2/favicons?domain=example.com"
+          alt=""
+          data-chattex-image-presentation="icon"
+        />
+      `),
+    ).toEqual([
+      {
+        type: "image",
+        src: "https://example.com/diagram.png",
+        alt: "Architecture",
+        title: null,
+        presentation: "content",
+      },
+      {
+        type: "image",
+        src: "https://www.google.com/s2/favicons?domain=example.com",
+        alt: "",
+        title: null,
+        presentation: "icon",
+      },
+    ]);
+
+    expect(
+      parser.parseHtml('<img src="legacy.png" alt="Legacy" />'),
+    ).toEqual([
+      {
+        type: "image",
+        src: "legacy.png",
+        alt: "Legacy",
+        title: null,
+        presentation: "content",
+      },
+    ]);
   });
 
   it("converts a full conversation into document AST", () => {

@@ -130,6 +130,105 @@ describe("ChatGptConversationApiReader", () => {
     );
   });
 
+  it("requests the complete conversation for the active workspace account", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ accessToken: "workspace-token" }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          accounts: {
+            "workspace-id": {
+              account: {
+                account_id: "account-123",
+              },
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          title: "Workspace conversation",
+          current_node: "assistant-2",
+          mapping: {
+            root: {
+              id: "root",
+              parent: null,
+              children: ["user-1"],
+              message: null,
+            },
+            "user-1": apiNode(
+              "user-1",
+              "root",
+              "user",
+              ["First question"],
+            ),
+            "assistant-1": apiNode(
+              "assistant-1",
+              "user-1",
+              "assistant",
+              ["First answer"],
+            ),
+            "user-2": apiNode(
+              "user-2",
+              "assistant-1",
+              "user",
+              ["Second question"],
+            ),
+            "assistant-2": apiNode(
+              "assistant-2",
+              "user-2",
+              "assistant",
+              ["Second answer"],
+            ),
+          },
+        }),
+      );
+
+    const conversation = await new ChatGptConversationApiReader(
+      fetcher,
+      "https://chatgpt.com/c/workspace-conversation",
+      {
+        cookie: "theme=dark; _account=workspace%2Did",
+      },
+    ).read();
+
+    expect(conversation.messages.map(({ id }) => id)).toEqual([
+      "user-1",
+      "assistant-1",
+      "user-2",
+      "assistant-2",
+    ]);
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      new URL(
+        "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27",
+      ),
+      {
+        credentials: "include",
+        headers: {
+          Authorization: "Bearer workspace-token",
+          "X-Authorization": "Bearer workspace-token",
+        },
+      },
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(
+      3,
+      new URL(
+        "https://chatgpt.com/backend-api/conversation/workspace-conversation",
+      ),
+      {
+        credentials: "include",
+        headers: {
+          Authorization: "Bearer workspace-token",
+          "Chatgpt-Account-Id": "account-123",
+          "X-Authorization": "Bearer workspace-token",
+        },
+      },
+    );
+  });
+
   it("rejects URLs without a conversation id", async () => {
     await expect(
       new ChatGptConversationApiReader(
@@ -219,6 +318,56 @@ describe("ChatGptConversationApiReader", () => {
       { id: "assistant-visible", order: 1 },
     ]);
     expect(conversation.messages[1].text).toBe("Visible answer");
+  });
+
+  it("keeps visible messages whose text is stored in structured parts", async () => {
+    const fetcher = createApiFetcher({
+      title: "Structured text",
+      current_node: "assistant-1",
+      mapping: {
+        root: {
+          id: "root",
+          parent: null,
+          children: ["user-1"],
+          message: null,
+        },
+        "user-1": apiNode(
+          "user-1",
+          "root",
+          "user",
+          [
+            {
+              content_type: "audio_transcription",
+              text: "Question from structured content",
+            },
+          ],
+        ),
+        "assistant-1": apiNode(
+          "assistant-1",
+          "user-1",
+          "assistant",
+          ["Complete answer"],
+        ),
+      },
+    });
+
+    const conversation = await new ChatGptConversationApiReader(
+      fetcher,
+      "https://chatgpt.com/c/structured-text",
+    ).read();
+
+    expect(
+      conversation.messages.map(({ role, text }) => ({ role, text })),
+    ).toEqual([
+      {
+        role: "user",
+        text: "Question from structured content",
+      },
+      {
+        role: "assistant",
+        text: "Complete answer",
+      },
+    ]);
   });
 
   it("reports rejected requests without leaking the access token", async () => {

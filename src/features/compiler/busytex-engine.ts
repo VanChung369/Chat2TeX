@@ -8,6 +8,11 @@ import type {
   LatexEngine,
 } from "./types";
 
+import {
+  extractCompileDiagnostic,
+  hasFatalCompileDiagnostic,
+} from "./compile-diagnostics";
+
 interface BusyTexCompileResult {
   success: boolean;
   pdf?: Uint8Array;
@@ -63,11 +68,17 @@ export class BusyTexEngine implements LatexEngine {
 
     const log = result.log ?? "";
 
-    if (!result.success || !result.pdf) {
+    const fatalDiagnostic = hasFatalCompileDiagnostic(log)
+      ? extractCompileDiagnostic(log)
+      : null;
+
+    if (!result.success || !result.pdf || fatalDiagnostic) {
       throw new BusyTexCompileError(
-        `XeLaTeX compilation failed with exit code ${
-          result.exitCode ?? "unknown"
-        }.`,
+        fatalDiagnostic
+          ? `XeLaTeX compilation failed. ${fatalDiagnostic}`
+          : `XeLaTeX compilation failed with exit code ${
+              result.exitCode ?? "unknown"
+            }.`,
         log,
       );
     }

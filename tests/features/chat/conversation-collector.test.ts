@@ -313,4 +313,41 @@ describe("ConversationCollector", () => {
     expect(conversation.messages).toHaveLength(2);
     expect(progress).toEqual([null, null, null, null]);
   });
+
+  it("rejects a known-partial collection after exhausting its passes", async () => {
+    const initialSnapshot: ViewportSnapshot = {
+      scrollTop: 200,
+      scrollHeight: 900,
+      clientHeight: 300,
+    };
+    const viewport = new FakeViewport(
+      [
+        {
+          viewport: {
+            scrollTop: 0,
+            scrollHeight: 900,
+            clientHeight: 300,
+          },
+          messages: [createMessage(8, "user"), createMessage(9, "assistant")],
+        },
+      ],
+      initialSnapshot,
+    );
+
+    viewport.currentPage = -1;
+
+    const collector = new ConversationCollector(
+      new FakeReader(viewport, [false]),
+      viewport,
+      {
+        maxPasses: 3,
+        stableTopPasses: 1,
+      },
+    );
+
+    await expect(collector.collect()).rejects.toThrow(
+      "Stopped after collecting 2 messages without reaching the beginning",
+    );
+    expect(viewport.restoredSnapshot).toEqual(initialSnapshot);
+  });
 });

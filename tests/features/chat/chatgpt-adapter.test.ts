@@ -125,8 +125,8 @@ describe("ChatGPTAdapter", () => {
 
   it("reports whether the first numbered conversation turn is mounted", () => {
     const firstTurn = createTestDocument(`
-      <article data-testid="conversation-turn-0"></article>
       <article data-testid="conversation-turn-1"></article>
+      <article data-testid="conversation-turn-2"></article>
     `);
 
     const partialTurns = createTestDocument(`
@@ -175,6 +175,9 @@ describe("ChatGPTAdapter", () => {
     );
     const result = new LatexGenerator().generate(documentAst);
 
+    expect(conversation.messages[0].html).toContain(
+      'data-chattex-image-presentation="content"',
+    );
     expect(result.assets).toEqual([
       {
         id: "image-001",
@@ -184,6 +187,57 @@ describe("ChatGPTAdapter", () => {
         alt: "Generated landscape",
       },
     ]);
+  });
+
+  it("retains citation favicons and classifies them as icons", () => {
+    const testDocument = createTestDocument(`
+      <article data-testid="conversation-turn-1">
+        <div
+          data-message-author-role="assistant"
+          data-message-id="assistant-citation"
+        >
+          <div class="markdown">
+            <p>See the cited browser documentation.</p>
+
+            <a
+              data-testid="citation-inline"
+              href="https://github.com"
+            >
+              <img
+                src="https://icons.duckduckgo.com/ip3/github.com.ico"
+                alt=""
+                width="32"
+                height="32"
+              />
+            </a>
+          </div>
+
+          <a
+            data-testid="citation"
+            href="https://developer.chrome.com/docs/extensions"
+          >
+            <img
+              src="https://www.google.com/s2/favicons?domain=developer.chrome.com&sz=128"
+              alt=""
+              width="128"
+              height="128"
+            />
+          </a>
+        </div>
+      </article>
+    `);
+
+    const [message] = new ChatGPTAdapter(
+      testDocument,
+    ).extractMountedMessages();
+
+    expect(message.html).toContain("See the cited browser documentation.");
+    expect(message.html.match(/<img/g)).toHaveLength(2);
+    expect(
+      message.html.match(/data-chattex-image-presentation="icon"/g),
+    ).toHaveLength(2);
+    expect(message.html).toContain("favicons");
+    expect(message.html).toContain("icons.duckduckgo.com");
   });
 
   it("ignores unsupported roles and empty messages", () => {

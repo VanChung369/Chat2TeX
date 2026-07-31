@@ -5,6 +5,7 @@ import type {
   ChatDocumentAst,
   ChatMessageAst,
   HeadingBlock,
+  ImagePresentation,
   InlineNode,
   ListBlock,
   TableRowNode,
@@ -192,6 +193,7 @@ export class HtmlToAstParser {
             src: element.getAttribute("src") ?? "",
             alt: element.getAttribute("alt") ?? "",
             title: element.getAttribute("title"),
+            presentation: readImagePresentation(element),
           },
         ];
     }
@@ -433,6 +435,14 @@ export class HtmlToAstParser {
   }
 }
 
+function readImagePresentation(
+  element: HTMLElement,
+): ImagePresentation {
+  return element.getAttribute("data-chattex-image-presentation") === "icon"
+    ? "icon"
+    : "content";
+}
+
 function extractLatexSource(element: HTMLElement): string | null {
   const annotation = element.querySelector(
     'annotation[encoding="application/x-tex"]',
@@ -454,6 +464,16 @@ function readCodeLanguage(
   codeElement: HTMLElement | null,
   preElement: HTMLElement,
 ): string | null {
+  for (const element of [codeElement, preElement]) {
+    const value =
+      element?.getAttribute("data-language") ??
+      element?.getAttribute("data-lang");
+
+    if (value?.trim()) {
+      return value.trim().toLowerCase();
+    }
+  }
+
   const classNames = [
     ...(codeElement?.classList ?? []),
     ...preElement.classList,
@@ -464,6 +484,63 @@ function readCodeLanguage(
 
     if (match?.[1]) {
       return match[1].toLowerCase();
+    }
+  }
+
+  let currentElement: Element | null = preElement;
+
+  for (let depth = 0; depth < 3 && currentElement; depth += 1) {
+    const headerLanguage = readRecognizedLanguageLabel(
+      currentElement.previousElementSibling,
+    );
+
+    if (headerLanguage) {
+      return headerLanguage;
+    }
+
+    currentElement = currentElement.parentElement;
+  }
+
+  return null;
+}
+
+const CODE_LANGUAGE_ALIASES = new Set([
+  "bash",
+  "c",
+  "c++",
+  "cpp",
+  "css",
+  "html",
+  "java",
+  "javascript",
+  "js",
+  "json",
+  "jsx",
+  "py",
+  "python",
+  "sh",
+  "shell",
+  "sql",
+  "ts",
+  "tsx",
+  "typescript",
+  "xml",
+]);
+
+function readRecognizedLanguageLabel(
+  container: Element | null,
+): string | null {
+  if (!container) {
+    return null;
+  }
+
+  const candidates = [container, ...container.querySelectorAll("*")];
+
+  for (const candidate of candidates) {
+    const label = candidate.textContent?.trim().toLowerCase() ?? "";
+
+    if (CODE_LANGUAGE_ALIASES.has(label)) {
+      return label;
     }
   }
 

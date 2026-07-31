@@ -5,6 +5,7 @@ import {
   extractCompileDiagnostic,
   findFailingProjectPaths,
   formatCompileFailure,
+  hasFatalCompileDiagnostic,
   readCompileLog,
 } from "@/src/features/compiler/compile-diagnostics";
 
@@ -42,6 +43,20 @@ describe("compile diagnostics", () => {
         "xdvipdfmx:fatal: Image inclusion failed for assets/image.png.",
       ),
     ).toBe("Image inclusion failed for assets/image.png.");
+  });
+
+  it("distinguishes fatal diagnostics from package metadata", () => {
+    expect(
+      hasFatalCompileDiagnostic(
+        "Package: infwarerr Providing info/warning/error messages",
+      ),
+    ).toBe(false);
+
+    expect(
+      hasFatalCompileDiagnostic(
+        "! Package Listings Error: Couldn't load requested language.",
+      ),
+    ).toBe(true);
   });
 
   it("does not duplicate a diagnostic already present in the message", () => {

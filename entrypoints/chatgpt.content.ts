@@ -2,6 +2,10 @@ import { browser } from "wxt/browser";
 
 import { ChatGPTAdapter } from "@/src/features/chat/chatgpt-adapter";
 
+import { ChatGptConversationApiReader } from "@/src/features/chat/chatgpt-conversation-api-reader";
+
+import { CompleteConversationReader } from "@/src/features/chat/complete-conversation-reader";
+
 import { ConversationCollector } from "@/src/features/chat/conversation-collector";
 
 import { DomConversationViewport } from "@/src/features/chat/dom-conversation-viewport";
@@ -33,6 +37,21 @@ export default defineContentScript({
     const adapter = new ChatGPTAdapter();
 
     const pageImageReader = new PageImageReader();
+    const apiFetcher = window.fetch.bind(window);
+    const completeConversationReader = new CompleteConversationReader(
+      {
+        read: () =>
+          new ChatGptConversationApiReader(
+            apiFetcher,
+            window.location.href,
+            {
+              cookie: document.cookie,
+            },
+          ).read(),
+      },
+      () => adapter.extractConversation(),
+      () => runConversationCollection(adapter),
+    );
 
     let collectionPromise: Promise<ChatConversation> | null = null;
 
@@ -41,9 +60,11 @@ export default defineContentScript({
         return collectionPromise;
       }
 
-      collectionPromise = runConversationCollection(adapter).finally(() => {
-        collectionPromise = null;
-      });
+      collectionPromise = completeConversationReader
+        .read()
+        .finally(() => {
+          collectionPromise = null;
+        });
 
       return collectionPromise;
     };

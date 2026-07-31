@@ -201,6 +201,31 @@ function createDocument(): ChatDocumentAst {
             src: "https://example.com/binary-search.webp",
             alt: "Binary search diagram",
             title: null,
+            presentation: "content",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function createCodeDocument(
+  language: string | null,
+  code: string,
+): ChatDocumentAst {
+  return {
+    title: "Code sample",
+    url: "https://chatgpt.com/c/code",
+    messages: [
+      {
+        id: "assistant-code",
+        role: "assistant",
+        order: 0,
+        blocks: [
+          {
+            type: "code",
+            language,
+            code,
           },
         ],
       },
@@ -471,6 +496,104 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain("{Đ}{{Đ}}1");
   });
 
+  it("defines and uses TypeScript-specific listings keywords", () => {
+    const source = new LatexGenerator().generate(
+      createCodeDocument(
+        "typescript",
+        "interface User { readonly id: string }",
+      ),
+    ).source;
+
+    expect(source).toContain("\\lstdefinelanguage{ChatTypeScript}");
+    expect(source).not.toContain("  language=JavaScript,");
+    expect(source).toContain(
+      "morekeywords={break,case,catch,class,const,continue,debugger,default,delete,do,else,export,extends,finally,for,from,function,get,if,import,in,instanceof,let,new,of,return,set,static,super,switch,this,throw,try,typeof,var,void,while,with,yield,async,await,interface,type,implements,readonly,public,private,protected,enum,namespace,declare,abstract,unknown,never,keyof,infer,as,satisfies}",
+    );
+    expect(source).toContain("morecomment=[l]{//}");
+    expect(source).toContain("morecomment=[s]{/*}{*/}");
+    expect(source).toContain('morestring=[b]"');
+    expect(source).toContain("morestring=[b]'");
+    expect(source).toContain(
+      "\\begin{lstlisting}[language=ChatTypeScript]",
+    );
+  });
+
+  it("uses a bundled JavaScript definition instead of an unavailable listings language", () => {
+    const source = new LatexGenerator().generate(
+      createCodeDocument(
+        "javascript",
+        "const answer = async () => await Promise.resolve(42);",
+      ),
+    ).source;
+
+    expect(source).toContain("\\lstdefinelanguage{ChatJavaScript}");
+    expect(source).toContain(
+      "\\begin{lstlisting}[language=ChatJavaScript]",
+    );
+    expect(source).not.toContain(
+      "\\begin{lstlisting}[language=JavaScript]",
+    );
+  });
+
+  it.each([
+    ["css", "ChatCSS"],
+    ["html", "ChatHTML"],
+    ["xml", "ChatHTML"],
+  ])(
+    "uses the bundled %s listings definition",
+    (language, listingLanguage) => {
+      const source = new LatexGenerator().generate(
+        createCodeDocument(language, "<main class='page'>color: red;</main>"),
+      ).source;
+
+      expect(source).toContain(
+        `\\lstdefinelanguage{${listingLanguage}}`,
+      );
+      expect(source).toContain(
+        `\\begin{lstlisting}[language=${listingLanguage}]`,
+      );
+    },
+  );
+
+  it("escapes code-number macro parameters nested inside IfFileExists", () => {
+    const source = new LatexGenerator().generate(
+      createCodeDocument("typescript", "const value: number = 1;"),
+    ).source;
+
+    expect(source).toContain(
+      [
+        "\\IfFileExists{accsupp.sty}{",
+        "  \\usepackage{accsupp}",
+        "  \\newcommand{\\chatcodenumber}[1]{%",
+        "    \\BeginAccSupp{method=escape,ActualText={}}##1\\EndAccSupp{}%",
+        "  }",
+        "}{",
+        "  \\newcommand{\\chatcodenumber}[1]{##1}",
+        "}",
+      ].join("\n"),
+    );
+  });
+
+  it("infers TypeScript only from strong unlabeled syntax", () => {
+    const inferredSource = new LatexGenerator().generate(
+      createCodeDocument(
+        null,
+        "interface User { id: string }\nconst user: User = { id: '1' };",
+      ),
+    ).source;
+    const plainSource = new LatexGenerator().generate(
+      createCodeDocument(null, "plain words without a language"),
+    ).source;
+
+    expect(inferredSource).toContain(
+      "\\begin{lstlisting}[language=ChatTypeScript]",
+    );
+    expect(plainSource).toContain("\\begin{lstlisting}");
+    expect(plainSource).not.toContain(
+      "\\begin{lstlisting}[language=ChatTypeScript]",
+    );
+  });
+
   it("escapes special LaTeX characters in normal text", () => {
     const generator = new LatexGenerator();
 
@@ -493,10 +616,10 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain("\\definecolor{codecomment}{HTML}{397052}");
     expect(result.source).toContain("\\definecolor{codelabel}{HTML}{8A5A3B}");
     expect(result.source).toContain(
-      "{\\sffamily\\scriptsize\\bfseries\\color{codelabel}\\MakeUppercase{JavaScript}\\par}",
+      "{\\sffamily\\scriptsize\\bfseries\\color{codelabel}\\MakeUppercase{TypeScript}\\par}",
     );
     expect(result.source).toContain(
-      "\\begin{lstlisting}[language=JavaScript]",
+      "\\begin{lstlisting}[language=ChatTypeScript]",
     );
     expect(result.source).toContain(
       "backgroundcolor=\\color{codebackground}",
@@ -507,10 +630,18 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain(
       "identifierstyle=\\color{codeforeground}",
     );
-    expect(result.source).toContain("numbers=left");
+    expect(result.source).toContain("\\IfFileExists{accsupp.sty}{");
+    expect(result.source).toContain("\\usepackage{accsupp}");
     expect(result.source).toContain(
-      "numberstyle=\\scriptsize\\color{bookmuted}",
+      "\\newcommand{\\chatcodenumber}[1]",
     );
+    expect(result.source).toContain(
+      "\\BeginAccSupp{method=escape,ActualText={}}##1\\EndAccSupp{}",
+    );
+    expect(result.source).toContain(
+      "numberstyle=\\scriptsize\\color{bookmuted}\\chatcodenumber",
+    );
+    expect(result.source).toContain("\\lstset{numbers=none}");
     expect(result.source).not.toContain("title={JavaScript}");
 
     expect(result.source).toContain("\\begin{enumerate}[start=2]");
@@ -565,6 +696,7 @@ describe("LatexGenerator", () => {
               src: "https://example.com/diagram.webp",
               alt: "System architecture",
               title: null,
+              presentation: "content",
             },
           ],
         },
@@ -584,6 +716,52 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain(
       "\\IfFileExists{assets/image-001.png}",
     );
+    expect(result.source).toContain("\\usepackage[export]{adjustbox}");
+    expect(result.source).toContain("    max width=\\linewidth,");
+    expect(result.source).toContain(
+      "    max height=0.7\\textheight,",
+    );
+    expect(result.source).not.toContain("    width=\\linewidth,");
+    expect(result.source).not.toContain("    height=0.7\\textheight,");
+  });
+
+  it("renders adjacent icon images as one compact row", () => {
+    const result = new LatexGenerator().generate({
+      title: "Citation icons",
+      url: "https://chatgpt.com/c/icons",
+      messages: [
+        {
+          id: "assistant-icons",
+          role: "assistant",
+          order: 0,
+          blocks: [
+            {
+              type: "image",
+              src: "https://example.com/chrome.png",
+              alt: "Chrome",
+              title: null,
+              presentation: "icon",
+            },
+            {
+              type: "image",
+              src: "https://example.com/github.png",
+              alt: "GitHub",
+              title: null,
+              presentation: "icon",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.source).toContain("\\begin{chattexiconrow}");
+    expect(result.source).toContain("max width=1.4em");
+    expect(result.source).toContain("max height=1.4em");
+    expect(
+      result.source.match(/\\begin\{chattexiconrow\}/g),
+    ).toHaveLength(1);
+    expect(result.source).toContain("\\texttt{[icon unavailable]}");
+    expect(result.assets).toHaveLength(2);
   });
 
   it("registers image assets in appearance order", () => {

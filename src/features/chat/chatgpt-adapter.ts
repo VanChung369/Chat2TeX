@@ -1,4 +1,8 @@
 import type { ChatConversation, ChatMessage, ChatRole } from "./types";
+import {
+  CHATTEX_IMAGE_PRESENTATION_ATTRIBUTE,
+  classifyChatImage,
+} from "./image-eligibility";
 import { CHATGPT_MESSAGE_SELECTOR, CHATGPT_TURN_SELECTOR } from "./selectors";
 
 const CONTENT_SELECTOR = [
@@ -51,20 +55,20 @@ export class ChatGPTAdapter {
   }
 
   hasConversationStart(): boolean | null {
-    const numberedTurns = Array.from(
+    const turnNumbers = Array.from(
       this.documentRef.querySelectorAll<HTMLElement>(CHATGPT_TURN_SELECTOR),
     )
       .map((element) => element.getAttribute("data-testid") ?? "")
       .map((testId) => testId.match(/^conversation-turn-(\d+)$/))
-      .filter((match): match is RegExpMatchArray => match !== null);
+      .filter((match): match is RegExpMatchArray => match !== null)
+      .map((match) => Number.parseInt(match[1], 10))
+      .filter((turnNumber) => !Number.isNaN(turnNumber));
 
-    if (numberedTurns.length === 0) {
+    if (turnNumbers.length === 0) {
       return null;
     }
 
-    return numberedTurns.some(
-      (match) => Number.parseInt(match[1], 10) === 0,
-    );
+    return Math.min(...turnNumbers) <= 1;
   }
 
   getConversationTitle(): string {
@@ -217,6 +221,15 @@ export class ChatGPTAdapter {
       .querySelectorAll(NOISY_ELEMENT_SELECTOR)
       .forEach((element) => element.remove());
 
+    clone
+      .querySelectorAll<HTMLImageElement>("img")
+      .forEach((imageElement) => {
+        imageElement.setAttribute(
+          CHATTEX_IMAGE_PRESENTATION_ATTRIBUTE,
+          classifyChatImage(imageElement),
+        );
+      });
+
     const retainedImageSources = new Set(
       Array.from(clone.querySelectorAll<HTMLImageElement>("img"))
         .map(readImageSource)
@@ -233,6 +246,10 @@ export class ChatGPTAdapter {
       const imageClone = imageElement.cloneNode(false) as HTMLImageElement;
 
       imageClone.setAttribute("src", sourceUrl);
+      imageClone.setAttribute(
+        CHATTEX_IMAGE_PRESENTATION_ATTRIBUTE,
+        classifyChatImage(imageElement),
+      );
       clone.append(imageClone);
       retainedImageSources.add(sourceUrl);
     }

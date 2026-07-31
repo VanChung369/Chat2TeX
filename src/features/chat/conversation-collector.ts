@@ -65,6 +65,7 @@ export class ConversationCollector {
 
     let previousTopSignature = "";
     let stableTopPasses = 0;
+    let collectionCompleted = false;
 
     try {
       this.viewport.scrollToBottom();
@@ -118,6 +119,7 @@ export class ConversationCollector {
               : this.options.stableTopPasses;
 
           if (stableTopPasses >= requiredStablePasses) {
+            collectionCompleted = true;
             break;
           }
 
@@ -136,6 +138,13 @@ export class ConversationCollector {
       }
     } finally {
       this.viewport.restore(originalViewport);
+    }
+
+    if (!collectionCompleted) {
+      throw new Error(
+        `Stopped after collecting ${collectedMessages.size} messages ` +
+          "without reaching the beginning of the conversation.",
+      );
     }
 
     const baseConversation = this.reader.extractConversation();

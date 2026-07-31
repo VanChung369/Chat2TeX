@@ -2,6 +2,7 @@ import type {
   BlockNode,
   ChatDocumentAst,
   ChatMessageAst,
+  ImageBlock,
   InlineNode,
   ListBlock,
   TableBlock,
@@ -118,6 +119,7 @@ export class LatexGenerator {
       "\\usepackage{amsmath}",
       "\\usepackage{amssymb}",
       "\\usepackage{graphicx}",
+      "\\usepackage[export]{adjustbox}",
       "\\usepackage{longtable}",
       "\\usepackage{booktabs}",
       "\\usepackage{listings}",
@@ -191,6 +193,12 @@ export class LatexGenerator {
       "  \\par\\endgroup\\bigskip",
       "}",
       "",
+      "\\newenvironment{chattexiconrow}{%",
+      "  \\par\\smallskip\\begingroup\\centering\\noindent%",
+      "}{%",
+      "  \\par\\endgroup\\smallskip%",
+      "}",
+      "",
       "\\makeatletter",
       "\\newcommand{\\chatbooktitle}{}",
       "\\newcommand{\\setchatbooktitle}[1]{\\renewcommand{\\chatbooktitle}{#1}}",
@@ -233,14 +241,56 @@ export class LatexGenerator {
       "  {\\normalfont\\sffamily\\normalsize\\bfseries\\color{bookaccent}}}",
       "\\makeatother",
       "",
+      "\\IfFileExists{accsupp.sty}{",
+      "  \\usepackage{accsupp}",
+      "  \\newcommand{\\chatcodenumber}[1]{%",
+      "    \\BeginAccSupp{method=escape,ActualText={}}##1\\EndAccSupp{}%",
+      "  }",
+      "}{",
+      "  \\newcommand{\\chatcodenumber}[1]{##1}",
+      "}",
+      "",
+      "\\lstdefinelanguage{ChatJavaScript}{",
+      "  sensitive=true,",
+      "  morekeywords={break,case,catch,class,const,continue,debugger,default,delete,do,else,export,extends,finally,for,from,function,get,if,import,in,instanceof,let,new,of,return,set,static,super,switch,this,throw,try,typeof,var,void,while,with,yield,async,await},",
+      "  morecomment=[l]{//},",
+      "  morecomment=[s]{/*}{*/},",
+      '  morestring=[b]",',
+      "  morestring=[b]'",
+      "}",
+      "",
+      "\\lstdefinelanguage{ChatCSS}{",
+      "  sensitive=true,",
+      "  alsoletter={-},",
+      "  morekeywords={align-items,background,background-color,border,border-radius,bottom,box-shadow,color,display,flex,flex-direction,font-family,font-size,font-weight,gap,grid,grid-template-columns,height,justify-content,left,line-height,margin,margin-bottom,margin-left,margin-right,margin-top,max-height,max-width,min-height,min-width,opacity,overflow,padding,padding-bottom,padding-left,padding-right,padding-top,position,right,text-align,text-decoration,top,transform,transition,width,z-index},",
+      "  morecomment=[s]{/*}{*/},",
+      '  morestring=[b]",',
+      "  morestring=[b]'",
+      "}",
+      "",
+      "\\lstdefinelanguage{ChatHTML}{",
+      "  sensitive=false,",
+      "  morekeywords={html,head,body,main,header,footer,nav,section,article,aside,div,span,picture,img,a,p,h1,h2,h3,h4,h5,h6,ul,ol,li,table,thead,tbody,tr,th,td,form,label,input,button,script,style,link,meta,title,template,slot,canvas,svg,path,class,id,href,src,alt,type,name,value,role,aria-label,data-testid},",
+      "  morecomment=[s]{<!--}{-->},",
+      '  morestring=[b]",',
+      "  morestring=[b]'",
+      "}",
+      "",
+      "\\lstdefinelanguage{ChatTypeScript}{",
+      "  sensitive=true,",
+      "  morekeywords={break,case,catch,class,const,continue,debugger,default,delete,do,else,export,extends,finally,for,from,function,get,if,import,in,instanceof,let,new,of,return,set,static,super,switch,this,throw,try,typeof,var,void,while,with,yield,async,await,interface,type,implements,readonly,public,private,protected,enum,namespace,declare,abstract,unknown,never,keyof,infer,as,satisfies},",
+      "  morecomment=[l]{//},",
+      "  morecomment=[s]{/*}{*/},",
+      '  morestring=[b]",',
+      "  morestring=[b]'",
+      "}",
+      "",
       "\\lstset{",
       "  basicstyle=\\ttfamily\\footnotesize\\color{codeforeground},",
       "  identifierstyle=\\color{codeforeground},",
       "  keywordstyle=\\bfseries\\color{codekeyword},",
       "  commentstyle=\\itshape\\color{codecomment},",
       "  stringstyle=\\color{codestring},",
-      "  numbers=left,",
-      "  numberstyle=\\scriptsize\\color{bookmuted},",
       "  numbersep=8pt,",
       "  stepnumber=1,",
       "  breaklines=true,",
@@ -259,6 +309,15 @@ export class LatexGenerator {
       `  literate=${renderVietnameseListingsMappings()},`,
       "  aboveskip=0.9em,",
       "  belowskip=0.9em",
+      "}",
+      "",
+      "\\IfFileExists{accsupp.sty}{",
+      "  \\lstset{",
+      "    numbers=left,",
+      "    numberstyle=\\scriptsize\\color{bookmuted}\\chatcodenumber",
+      "  }",
+      "}{",
+      "  \\lstset{numbers=none}",
       "}",
     ].join("\n");
   }
@@ -388,10 +447,7 @@ export class LatexGenerator {
       headingLevelOffset,
     };
 
-    const content = message.blocks
-      .map((block) => this.renderBlock(block, context))
-      .filter(Boolean)
-      .join("\n\n");
+    const content = this.renderBlocks(message.blocks, context);
 
     const renderedContent = content || "\\emph{Empty message}";
 
@@ -526,9 +582,7 @@ export class LatexGenerator {
           "\\color{bookmuted}\\itshape",
           "\\noindent\\textcolor{bookaccent}{\\rule{18mm}{0.8pt}}",
           "\\par\\smallskip",
-          block.blocks
-            .map((child) => this.renderBlock(child, context))
-            .join("\n\n"),
+          this.renderBlocks(block.blocks, context),
           "\\end{quote}",
         ].join("\n");
 
@@ -539,7 +593,9 @@ export class LatexGenerator {
         return ["\\[", block.latex.trim(), "\\]"].join("\n");
 
       case "image":
-        return this.renderBlockImage(block.src, block.alt);
+        return block.presentation === "icon"
+          ? this.renderIconRow([block])
+          : this.renderBlockImage(block.src, block.alt);
 
       case "horizontal-rule":
         return [
@@ -550,6 +606,42 @@ export class LatexGenerator {
           "\\medskip",
         ].join("\n");
     }
+  }
+
+  private renderBlocks(
+    blocks: BlockNode[],
+    context: BlockRenderContext,
+  ): string {
+    const renderedBlocks: string[] = [];
+    let pendingIcons: ImageBlock[] = [];
+
+    const flushIcons = (): void => {
+      if (pendingIcons.length === 0) {
+        return;
+      }
+
+      renderedBlocks.push(this.renderIconRow(pendingIcons));
+      pendingIcons = [];
+    };
+
+    for (const block of blocks) {
+      if (block.type === "image" && block.presentation === "icon") {
+        pendingIcons.push(block);
+        continue;
+      }
+
+      flushIcons();
+
+      const renderedBlock = this.renderBlock(block, context);
+
+      if (renderedBlock) {
+        renderedBlocks.push(renderedBlock);
+      }
+    }
+
+    flushIcons();
+
+    return renderedBlocks.join("\n\n");
   }
 
   private renderHeading(
@@ -628,8 +720,13 @@ export class LatexGenerator {
   }
 
   private renderCodeBlock(language: string | null, code: string): string {
-    const listingLanguage = mapListingLanguage(language);
-    const displayLanguage = listingLanguage ?? language?.trim() ?? "";
+    const detectedLanguage =
+      language?.trim().toLowerCase() || inferCodeLanguage(code);
+    const listingLanguage = mapListingLanguage(detectedLanguage);
+    const displayLanguage = readDisplayLanguage(
+      detectedLanguage,
+      listingLanguage,
+    );
 
     const options = listingLanguage ? `[language=${listingLanguage}]` : "";
     const languageLabel = displayLanguage
@@ -665,9 +762,7 @@ export class LatexGenerator {
 
     const items = block.items
       .map((item) => {
-        const itemContent = item.blocks
-          .map((child) => this.renderBlock(child, context))
-          .join("\n\n");
+        const itemContent = this.renderBlocks(item.blocks, context);
 
         return ["\\item", itemContent].join(" ");
       })
@@ -836,15 +931,15 @@ export class LatexGenerator {
       "\\begin{center}",
       `\\IfFileExists{${asset.outputPath}}{`,
       "  \\includegraphics[",
-      "    width=\\linewidth,",
-      "    height=0.7\\textheight,",
+      "    max width=\\linewidth,",
+      "    max height=0.7\\textheight,",
       "    keepaspectratio",
       `  ]{${asset.outputPath}}`,
       caption ? "  \\par\\smallskip" : "",
       caption ? `  ${caption}` : "",
       "}{",
       "  \\fbox{",
-      "    \\parbox{0.85\\linewidth}{",
+      "    \\parbox{0.65\\linewidth}{",
       `      ${safeAlt}`,
       "    }",
       "  }",
@@ -853,6 +948,30 @@ export class LatexGenerator {
     ]
       .filter(Boolean)
       .join("\n");
+  }
+
+  private renderIconRow(images: ImageBlock[]): string {
+    const icons = images.map((image) => {
+      const asset = this.registerImage(image.src, image.alt);
+
+      return [
+        `\\IfFileExists{${asset.outputPath}}{`,
+        "  \\includegraphics[",
+        "    max width=1.4em,",
+        "    max height=1.4em,",
+        "    keepaspectratio",
+        `  ]{${asset.outputPath}}`,
+        "}{",
+        "  \\texttt{[icon unavailable]}",
+        "}",
+      ].join("\n");
+    });
+
+    return [
+      "\\begin{chattexiconrow}",
+      icons.join("\\hspace{0.55em plus 0.2em}\\allowbreak\n"),
+      "\\end{chattexiconrow}",
+    ].join("\n");
   }
 
   private renderInlineImage(sourceUrl: string, alt: string): string {
@@ -907,13 +1026,13 @@ function mapListingLanguage(language: string | null): string | null {
   const normalized = language.toLowerCase().trim();
 
   const languageMap: Readonly<Record<string, string>> = {
-    js: "JavaScript",
-    javascript: "JavaScript",
-    jsx: "JavaScript",
+    js: "ChatJavaScript",
+    javascript: "ChatJavaScript",
+    jsx: "ChatJavaScript",
 
-    ts: "JavaScript",
-    typescript: "JavaScript",
-    tsx: "JavaScript",
+    ts: "ChatTypeScript",
+    typescript: "ChatTypeScript",
+    tsx: "ChatTypeScript",
 
     py: "Python",
     python: "Python",
@@ -922,16 +1041,137 @@ function mapListingLanguage(language: string | null): string | null {
     shell: "bash",
     bash: "bash",
 
+    css: "ChatCSS",
+    json: "ChatJavaScript",
     sql: "SQL",
     java: "Java",
     c: "C",
     cpp: "C++",
     "c++": "C++",
-    html: "HTML",
-    xml: "XML",
+    html: "ChatHTML",
+    xml: "ChatHTML",
   };
 
   return languageMap[normalized] ?? null;
+}
+
+function readDisplayLanguage(
+  language: string | null,
+  listingLanguage: string | null,
+): string {
+  if (!language) {
+    return listingLanguage ?? "";
+  }
+
+  const displayNames: Readonly<Record<string, string>> = {
+    bash: "Bash",
+    cpp: "C++",
+    css: "CSS",
+    html: "HTML",
+    javascript: "JavaScript",
+    js: "JavaScript",
+    json: "JSON",
+    jsx: "JavaScript",
+    py: "Python",
+    python: "Python",
+    sh: "Shell",
+    shell: "Shell",
+    sql: "SQL",
+    ts: "TypeScript",
+    tsx: "TypeScript",
+    typescript: "TypeScript",
+    xml: "XML",
+  };
+
+  return displayNames[language] ?? listingLanguage ?? language;
+}
+
+function inferCodeLanguage(code: string): string | null {
+  const normalized = code.normalize("NFC").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (looksLikeJson(normalized)) {
+    return "json";
+  }
+
+  if (/^<(!doctype\s+html|[a-z][\w:-]*(?:\s|>|\/>))/iu.test(normalized)) {
+    return "html";
+  }
+
+  if (
+    /^#!.*\b(?:ba|z|k)?sh\b/mu.test(normalized) ||
+    /^(?:cd|curl|docker|echo|export|git|ls|mkdir|npm|pnpm|rm|sudo|yarn)\b/mu.test(
+      normalized,
+    )
+  ) {
+    return "bash";
+  }
+
+  if (
+    /^(?:def|class)\s+[A-Za-z_]\w*.*:\s*$/mu.test(normalized) ||
+    /^(?:from\s+\S+\s+import|import\s+[A-Za-z_][\w.]*)\b/mu.test(normalized)
+  ) {
+    return "python";
+  }
+
+  if (
+    /^(?:select|insert|update|delete|create|alter|drop|with)\b/iu.test(
+      normalized,
+    )
+  ) {
+    return "sql";
+  }
+
+  if (
+    /^[^{]+\{[\s\S]*[\w-]+\s*:\s*[^;{}]+;?[\s\S]*\}$/u.test(normalized)
+  ) {
+    return "css";
+  }
+
+  if (
+    /\b(?:interface|type|enum|namespace|implements|readonly|satisfies)\b/u.test(
+      normalized,
+    ) ||
+    /\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*:\s*[A-Za-z_$][\w$<>{}[\]|&., ]*/u.test(
+      normalized,
+    ) ||
+    /\([^)]*:\s*[A-Za-z_$][\w$<>{}[\]|&., ]*[^)]*\)\s*(?::\s*[^=]+)?=>/u.test(
+      normalized,
+    )
+  ) {
+    return "typescript";
+  }
+
+  if (
+    /\b(?:import|export|const|let|var|function)\b/u.test(normalized) ||
+    /=>/u.test(normalized)
+  ) {
+    return "javascript";
+  }
+
+  return null;
+}
+
+function looksLikeJson(value: string): boolean {
+  if (
+    !(
+      (value.startsWith("{") && value.endsWith("}")) ||
+      (value.startsWith("[") && value.endsWith("]"))
+    )
+  ) {
+    return false;
+  }
+
+  try {
+    JSON.parse(value);
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function detectDocumentLanguage(

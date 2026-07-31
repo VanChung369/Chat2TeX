@@ -2,6 +2,13 @@ const ERROR_PATTERN = /(^!\s+)|(\bfatal\b)|(\berror:?\b)/i;
 
 const SOURCE_LINE_PATTERN = /^l\.\d+\s+/;
 
+const FATAL_COMPILE_PATTERN =
+  /(^!\s+)|(\bfatal:)|(^\s*(?:error:|emergency stop\b))/im;
+
+export function hasFatalCompileDiagnostic(log: string): boolean {
+  return FATAL_COMPILE_PATTERN.test(log);
+}
+
 export function findFailingProjectPaths(
   log: string,
   projectPaths: readonly string[],

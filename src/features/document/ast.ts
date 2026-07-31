@@ -76,11 +76,14 @@ export interface MathBlock {
   latex: string;
 }
 
+export type ImagePresentation = "content" | "icon";
+
 export interface ImageBlock {
   type: "image";
   src: string;
   alt: string;
   title: string | null;
+  presentation: ImagePresentation;
 }
 
 export interface HorizontalRuleBlock {
