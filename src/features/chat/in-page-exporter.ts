@@ -334,7 +334,7 @@ export class InPageExporterUI {
       </div>
       <div class="c2t-body">
         <div>
-          <span class="c2t-field-label">1. Template Bố Cục</span>
+          <span class="c2t-field-label">1. Layout Template</span>
           <select id="chat2tex-template-select" class="c2t-select">
             <option value="academic">🎓 Academic Article</option>
             <option value="editorial-book">📚 Editorial Book</option>
@@ -351,20 +351,20 @@ export class InPageExporterUI {
 
         <div class="c2t-row">
           <div>
-            <span class="c2t-field-label">2. Màu Nền</span>
+            <span class="c2t-field-label">2. Background Color</span>
             <select id="chat2tex-color-select" class="c2t-select">
-              <option value="default">✨ Theo Mẫu</option>
-              <option value="white">⚪ Trắng Tinh</option>
-              <option value="cream">📜 Kem Ngà</option>
-              <option value="sepia">📔 Vàng Sepia</option>
-              <option value="grey">🩶 Xám Nhạt</option>
-              <option value="dark">🌙 Nền Tối</option>
+              <option value="default">✨ Use Template</option>
+              <option value="white">⚪ Pure White</option>
+              <option value="cream">📜 Ivory</option>
+              <option value="sepia">📔 Sepia</option>
+              <option value="grey">🩶 Light Gray</option>
+              <option value="dark">🌙 Dark</option>
             </select>
           </div>
           <div>
-            <span class="c2t-field-label">3. Font Chữ</span>
+            <span class="c2t-field-label">3. Font</span>
             <select id="chat2tex-font-select" class="c2t-select">
-              <option value="default">✨ Theo Mẫu</option>
+              <option value="default">✨ Use Template</option>
               <option value="serif">📖 Serif</option>
               <option value="sans">✨ Sans-Serif</option>
               <option value="mono">📠 Monospace</option>
@@ -374,27 +374,27 @@ export class InPageExporterUI {
 
         <div class="c2t-row">
           <div>
-            <span class="c2t-field-label">4. Khổ Giấy</span>
+            <span class="c2t-field-label">4. Paper Size</span>
             <select id="chat2tex-size-select" class="c2t-select">
-              <option value="a4">📄 Khổ A4</option>
-              <option value="letter">📑 Khổ Letter</option>
-              <option value="a5">📖 Khổ A5 (Kindle)</option>
+              <option value="a4">📄 A4 Paper</option>
+              <option value="letter">📑 Letter Paper</option>
+              <option value="a5">📖 A5 Paper (Kindle)</option>
             </select>
           </div>
           <div>
-            <span class="c2t-field-label">5. Tác Giả / Watermark</span>
-            <input type="text" id="chat2tex-author-input" class="c2t-select" placeholder="Tùy chọn..." style="cursor:text;" />
+            <span class="c2t-field-label">5. Author / Watermark</span>
+            <input type="text" id="chat2tex-author-input" class="c2t-select" placeholder="Optional..." style="cursor:text;" />
           </div>
         </div>
 
         <div class="c2t-toggle-group">
           <label class="c2t-toggle" for="chat2tex-user-check">
-            <span class="c2t-toggle-label">Kèm câu hỏi của User</span>
+            <span class="c2t-toggle-label">Include User Questions</span>
             <input type="checkbox" id="chat2tex-user-check" />
             <span class="c2t-toggle-track"></span>
           </label>
           <label class="c2t-toggle" for="chat2tex-pdfonly-check">
-            <span class="c2t-toggle-label">Chỉ tải file PDF</span>
+            <span class="c2t-toggle-label">Download PDF Only</span>
             <input type="checkbox" id="chat2tex-pdfonly-check" />
             <span class="c2t-toggle-track"></span>
           </label>
@@ -403,11 +403,11 @@ export class InPageExporterUI {
         <div id="chat2tex-msg-list-container">
           <div class="c2t-msglist">
             <div class="c2t-msglist-header" id="chat2tex-msglist-header">
-              <span class="c2t-msglist-title">📋 Chọn lọc tin nhắn</span>
-              <span class="c2t-msglist-count" id="chat2tex-msglist-count">Đang tải...</span>
+              <span class="c2t-msglist-title">📋 Select Messages</span>
+              <span class="c2t-msglist-count" id="chat2tex-msglist-count">Loading...</span>
             </div>
             <div class="c2t-msglist-scroll" id="chat2tex-msglist-body">
-              <div class="c2t-msg-loading">⏳ Đang quét danh sách tin nhắn...</div>
+              <div class="c2t-msg-loading">⏳ Scanning messages...</div>
             </div>
           </div>
         </div>
@@ -422,7 +422,7 @@ export class InPageExporterUI {
         </div>
 
         <button id="chat2tex-start-btn" class="c2t-btn c2t-btn-primary">
-          🚀 Bắt đầu xuất PDF
+          🚀 Start PDF Export
         </button>
       </div>
     `;
@@ -480,8 +480,8 @@ export class InPageExporterUI {
         const btn = panel.querySelector<HTMLButtonElement>("#chat2tex-start-btn");
         if (btn) {
           btn.textContent = this.exportPdfOnly
-            ? "🚀 Bắt đầu xuất PDF"
-            : "🚀 Bắt đầu xuất PDF & TEX";
+            ? "🚀 Start PDF Export"
+            : "🚀 Start PDF & TEX Export";
         }
       };
     }
@@ -511,7 +511,7 @@ export class InPageExporterUI {
     } catch {
       const bodyEl = this.statusPanel?.querySelector<HTMLElement>("#chat2tex-msglist-body");
       if (bodyEl) {
-        bodyEl.innerHTML = `<div class="c2t-msg-loading" style="color:#ef4444;">⚠️ Không tải được danh sách tin nhắn.</div>`;
+        bodyEl.innerHTML = `<div class="c2t-msg-loading" style="color:#ef4444;">⚠️ Unable to load messages.</div>`;
       }
     } finally {
       this.isFetchingMessages = false;
@@ -524,7 +524,7 @@ export class InPageExporterUI {
     if (!bodyEl) return;
 
     const msgs = this.loadedMessages;
-    if (countEl) countEl.textContent = `${msgs.length} tin nhắn`;
+    if (countEl) countEl.textContent = `${msgs.length} messages`;
 
     bodyEl.innerHTML = msgs
       .map(
@@ -584,11 +584,11 @@ export class InPageExporterUI {
     if (startBtn) {
       startBtn.disabled = processing;
       if (processing) {
-        startBtn.innerHTML = `<span class="c2t-spinner"></span> Đang xuất...`;
+        startBtn.innerHTML = `<span class="c2t-spinner"></span> Exporting...`;
       } else {
         startBtn.innerHTML = this.exportPdfOnly
-          ? "🚀 Bắt đầu xuất PDF"
-          : "🚀 Bắt đầu xuất PDF & TEX";
+          ? "🚀 Start PDF Export"
+          : "🚀 Start PDF & TEX Export";
       }
     }
 
@@ -600,7 +600,7 @@ export class InPageExporterUI {
     this.isProcessing = true;
 
     this.setProcessingState(true);
-    this.setStatus("1/3 Quét cuộc trò chuyện...", "processing");
+    this.setStatus("1/3 Scanning conversation...", "processing");
 
     const updateStatus = (text: string) => {
       this.setStatus(text, "processing");
@@ -621,11 +621,15 @@ export class InPageExporterUI {
       }
 
       const successMsg = this.exportPdfOnly
-        ? "✅ Hoàn tất! File PDF đã được tải về."
-        : "✅ Hoàn tất! PDF, TEX & ZIP đã được tải về.";
+        ? "✅ Complete! The PDF has been downloaded."
+        : "✅ Complete! PDF, TEX, and ZIP files have been downloaded.";
 
       this.setStatus(successMsg, "success");
-      showToast(this.exportPdfOnly ? "✅ PDF đã tải xuống!" : "✅ PDF, TEX & ZIP đã tải xuống!");
+      showToast(
+        this.exportPdfOnly
+          ? "✅ PDF downloaded!"
+          : "✅ PDF, TEX, and ZIP files downloaded!",
+      );
 
       // All step dots done
       for (let i = 0; i < 3; i++) {
@@ -640,7 +644,7 @@ export class InPageExporterUI {
         rawMsg.includes("Extension context invalidated");
 
       const displayMsg = isConnectionErr
-        ? "⚠️ Extension vừa cập nhật — bấm F5 rồi thử lại."
+        ? "⚠️ The extension was updated — press F5 and try again."
         : `❌ ${rawMsg}`;
 
       this.setStatus(displayMsg, "error");

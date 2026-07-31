@@ -124,8 +124,8 @@ export class ConversationCollector {
           }
 
           /*
-           * Tiếp tục yêu cầu vị trí top để trang
-           * có cơ hội tải thêm các message cũ.
+           * Keep requesting the top position so the page has a chance
+           * to load more historical messages.
            */
           this.viewport.scrollToTop();
         } else {
@@ -170,8 +170,8 @@ function mergeMessages(
     }
 
     /*
-     * Một message có thể đang stream hoặc chưa render
-     * đầy đủ. Giữ phiên bản có nhiều nội dung hơn.
+     * A message may still be streaming or only partially rendered.
+     * Keep the version with more content.
      */
     const existingSize = existing.text.length + existing.html.length;
 

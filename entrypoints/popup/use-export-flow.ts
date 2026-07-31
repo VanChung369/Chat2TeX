@@ -132,8 +132,8 @@ export function useExportFlow() {
     }
 
     /*
-     * permissions.request() là lời gọi đầu tiên
-     * trong click handler để giữ user gesture.
+     * Keep permissions.request() as the first call in the click handler
+     * so the browser preserves the user gesture.
      */
     const granted = await browser.permissions.request({
       origins: missingOrigins,
@@ -460,7 +460,7 @@ async function sendTabMessageWithRetry<T>(
 
       if (isNoReceiver) {
         throw new Error(
-          "Không thể kết nối với trang ChatGPT. Vui lòng bấm F5 (Tải lại trang ChatGPT) rồi thử lại.",
+          "Unable to connect to the ChatGPT page. Press F5 to reload it, then try again.",
         );
       }
 
@@ -468,7 +468,7 @@ async function sendTabMessageWithRetry<T>(
     }
   }
 
-  throw new Error("Tốc độ phản hồi của trang ChatGPT quá chậm. Vui lòng tải lại trang.");
+  throw new Error("The ChatGPT page is responding too slowly. Please reload it.");
 }
 
 async function sendRuntimeMessageWithRetry<T>(
@@ -494,5 +494,5 @@ async function sendRuntimeMessageWithRetry<T>(
     }
   }
 
-  throw new Error("Tự động kết nối với Extension thất bại. Vui lòng thử lại.");
+  throw new Error("Unable to connect to the extension automatically. Please try again.");
 }

@@ -75,8 +75,8 @@ export class DomConversationViewport implements ConversationViewport {
 
   restore(snapshot: ViewportSnapshot): void {
     /*
-     * Giữ khoảng cách tương đối tính từ cuối trang.
-     * Cách này ổn hơn khi message cũ được prepend.
+     * Preserve the relative distance from the bottom of the page.
+     * This is more stable when older messages are prepended.
      */
     const distanceFromBottom = Math.max(
       0,

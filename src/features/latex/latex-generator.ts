@@ -48,21 +48,12 @@ const VIETNAMESE_CHARACTER_PATTERN =
 const VIETNAMESE_LISTINGS_CHARACTERS =
   "ÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬĐÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴàáảãạăằắẳẵặâầấẩẫậđèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ";
 
-const BOOK_LABELS: Readonly<Record<DocumentLanguage, BookLabels>> = {
-  en: {
-    contents: "Contents",
-    question: "Reader's question",
-    subtitle: "A thoughtfully typeset ChatGPT conversation",
-    source: "Source",
-    attribution: "Exported with Chat2TeX",
-  },
-  vi: {
-    contents: "Mục lục",
-    question: "Câu hỏi",
-    subtitle: "Cuộc trò chuyện ChatGPT được trình bày như một cuốn sách",
-    source: "Nguồn",
-    attribution: "Xuất bằng Chat2TeX",
-  },
+const BOOK_LABELS: Readonly<BookLabels> = {
+  contents: "Contents",
+  question: "Reader's question",
+  subtitle: "A thoughtfully typeset ChatGPT conversation",
+  source: "Source",
+  attribution: "Exported with Chat2TeX",
 };
 
 export class LatexGenerator {
@@ -80,7 +71,7 @@ export class LatexGenerator {
     this.assets = [];
 
     const language = detectDocumentLanguage(document);
-    const labels = BOOK_LABELS[language];
+    const labels = BOOK_LABELS;
 
     const templateId = options.templateId ?? "academic";
     const paperColor = options.paperColor ?? "default";
@@ -120,7 +111,6 @@ export class LatexGenerator {
           message,
           this.findMessageHeadingBaseLevel(message),
           message.role === "assistant" && hasQuestionSection ? 1 : 0,
-          language,
           labels,
           questionNumber,
           templateId,
@@ -698,7 +688,6 @@ export class LatexGenerator {
     message: ChatMessageAst,
     headingBaseLevel: number,
     headingLevelOffset: 0 | 1,
-    language: DocumentLanguage,
     labels: BookLabels,
     questionNumber: number,
     templateId: LatexTemplateId,
@@ -719,7 +708,7 @@ export class LatexGenerator {
 
     if (message.role === "user") {
       const questionTitle = escapeNormalizedText(
-        this.createQuestionTitle(message, questionNumber, language),
+        this.createQuestionTitle(message, questionNumber),
       );
       const questionLabel = escapeNormalizedText(
         `${labels.question} ${questionNumber}`,
@@ -739,7 +728,6 @@ export class LatexGenerator {
   private createQuestionTitle(
     message: ChatMessageAst,
     questionNumber: number,
-    language: DocumentLanguage,
   ): string {
     const questionText = message.blocks
       .map((block) => this.renderRawBlockText(block))
@@ -750,9 +738,7 @@ export class LatexGenerator {
       return conciseTitle;
     }
 
-    return language === "vi"
-      ? `Câu hỏi ${questionNumber}`
-      : `Question ${questionNumber}`;
+    return `Question ${questionNumber}`;
   }
 
   private renderRawBlockText(block: BlockNode): string {

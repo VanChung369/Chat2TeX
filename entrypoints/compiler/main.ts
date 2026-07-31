@@ -29,8 +29,7 @@ const compiler = new LatexCompiler(new BusyTexEngine());
 const sourcePackageBuilder = new SourcePackageBuilder();
 
 /*
- * Đảm bảo chỉ có một lần compile
- * chạy tại một thời điểm.
+ * Ensure only one compilation runs at a time.
  */
 let compilationQueue: Promise<void> = Promise.resolve();
 

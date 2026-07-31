@@ -25,10 +25,14 @@ export default function App() {
     null,
   );
 
-  const [selectedTemplate, setSelectedTemplate] = useState<import("@/src/features/latex/types").LatexTemplateId>("academic");
-  const [selectedColor, setSelectedColor] = useState<import("@/src/features/latex/types").LatexPaperColor>("default");
-  const [selectedFont, setSelectedFont] = useState<import("@/src/features/latex/types").LatexFontFamily>("default");
-  const [selectedPaperSize, setSelectedPaperSize] = useState<import("@/src/features/latex/types").LatexPaperSize>("a4");
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<import("@/src/features/latex/types").LatexTemplateId>("academic");
+  const [selectedColor, setSelectedColor] =
+    useState<import("@/src/features/latex/types").LatexPaperColor>("default");
+  const [selectedFont, setSelectedFont] =
+    useState<import("@/src/features/latex/types").LatexFontFamily>("default");
+  const [selectedPaperSize, setSelectedPaperSize] =
+    useState<import("@/src/features/latex/types").LatexPaperSize>("a4");
   const [authorName, setAuthorName] = useState("");
   const [exportPdfOnly, setExportPdfOnly] = useState(false);
   const [includeUserMessages, setIncludeUserMessages] = useState(true);
@@ -100,7 +104,10 @@ export default function App() {
   // Phase step helpers
   const phase = exportFlow.phase;
   const phaseIndex =
-    phase === "idle" || phase === "preparing" || phase === "permission-required" || phase === "processing-assets"
+    phase === "idle" ||
+    phase === "preparing" ||
+    phase === "permission-required" ||
+    phase === "processing-assets"
       ? 0
       : phase === "ready" || phase === "compiling"
         ? 1
@@ -111,14 +118,15 @@ export default function App() {
             : 0;
 
   const isPhaseDone = (idx: number) => phaseIndex > idx;
-  const isPhaseActive = (idx: number) => phaseIndex === idx && phase !== "idle" && phase !== "error";
+  const isPhaseActive = (idx: number) =>
+    phaseIndex === idx && phase !== "idle" && phase !== "error";
 
   return (
     <main className="popup">
       <header className="popup__header">
         <div className="brand">
           <div className="brand__icon" aria-hidden="true">
-            T<span>e</span>X
+            T
           </div>
 
           <div>
@@ -132,8 +140,8 @@ export default function App() {
         {status === "loading" && (
           <StatusCard
             variant="loading"
-            title="Đang kết nối..."
-            description="Kiểm tra tab ChatGPT đang mở..."
+            title="Connecting..."
+            description="Checking the open ChatGPT tab..."
           />
         )}
 
@@ -141,27 +149,34 @@ export default function App() {
           <>
             <StatusCard
               variant="success"
-              title="Tìm thấy cuộc trò chuyện"
+              title="Conversation found"
               description={conversation.title}
             />
 
             <div className="conversation fade-in">
-              <span className="conversation__label">Cuộc trò chuyện hiện tại</span>
-              <strong className="conversation__title">{conversation.title}</strong>
+              <span className="conversation__label">Current conversation</span>
+              <strong className="conversation__title">
+                {conversation.title}
+              </strong>
               <span className="conversation__meta">
-                {conversation.messageCount} tin nhắn
+                {conversation.messageCount} messages
               </span>
             </div>
 
             {/* Options */}
             <div className="options-card fade-in">
               <div>
-                <span className="options-card__label">1. Template Bố Cục</span>
+                <span className="options-card__label">1. Layout Template</span>
                 <select
                   id="app-template-select"
                   className="options-select"
                   value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value as import("@/src/features/latex/types").LatexTemplateId)}
+                  onChange={(e) =>
+                    setSelectedTemplate(
+                      e.target
+                        .value as import("@/src/features/latex/types").LatexTemplateId,
+                    )
+                  }
                 >
                   <option value="academic">🎓 Academic Article</option>
                   <option value="editorial-book">📚 Editorial Book</option>
@@ -178,31 +193,43 @@ export default function App() {
 
               <div className="options-row">
                 <div>
-                  <span className="options-card__label">2. Màu Nền</span>
+                  <span className="options-card__label">
+                    2. Background Color
+                  </span>
                   <select
                     id="app-color-select"
                     className="options-select"
                     value={selectedColor}
-                    onChange={(e) => setSelectedColor(e.target.value as import("@/src/features/latex/types").LatexPaperColor)}
+                    onChange={(e) =>
+                      setSelectedColor(
+                        e.target
+                          .value as import("@/src/features/latex/types").LatexPaperColor,
+                      )
+                    }
                   >
-                    <option value="default">✨ Theo Mẫu</option>
-                    <option value="white">⚪ Trắng Tinh</option>
-                    <option value="cream">📜 Kem Ngà</option>
-                    <option value="sepia">📔 Vàng Sepia</option>
-                    <option value="grey">🩶 Xám Nhạt</option>
-                    <option value="dark">🌙 Nền Tối</option>
+                    <option value="default">✨ Use Template</option>
+                    <option value="white">⚪ Pure White</option>
+                    <option value="cream">📜 Ivory</option>
+                    <option value="sepia">📔 Sepia</option>
+                    <option value="grey">🩶 Light Gray</option>
+                    <option value="dark">🌙 Dark</option>
                   </select>
                 </div>
 
                 <div>
-                  <span className="options-card__label">3. Font Chữ</span>
+                  <span className="options-card__label">3. Font</span>
                   <select
                     id="app-font-select"
                     className="options-select"
                     value={selectedFont}
-                    onChange={(e) => setSelectedFont(e.target.value as import("@/src/features/latex/types").LatexFontFamily)}
+                    onChange={(e) =>
+                      setSelectedFont(
+                        e.target
+                          .value as import("@/src/features/latex/types").LatexFontFamily,
+                      )
+                    }
                   >
-                    <option value="default">✨ Theo Mẫu</option>
+                    <option value="default">✨ Use Template</option>
                     <option value="serif">📖 Serif</option>
                     <option value="sans">✨ Sans-Serif</option>
                     <option value="mono">📠 Monospace</option>
@@ -212,26 +239,33 @@ export default function App() {
 
               <div className="options-row">
                 <div>
-                  <span className="options-card__label">4. Khổ Giấy</span>
+                  <span className="options-card__label">4. Paper Size</span>
                   <select
                     id="app-size-select"
                     className="options-select"
                     value={selectedPaperSize}
-                    onChange={(e) => setSelectedPaperSize(e.target.value as import("@/src/features/latex/types").LatexPaperSize)}
+                    onChange={(e) =>
+                      setSelectedPaperSize(
+                        e.target
+                          .value as import("@/src/features/latex/types").LatexPaperSize,
+                      )
+                    }
                   >
-                    <option value="a4">📄 Khổ A4</option>
-                    <option value="letter">📑 Khổ Letter</option>
-                    <option value="a5">📖 Khổ A5 (Kindle)</option>
+                    <option value="a4">📄 A4 Paper</option>
+                    <option value="letter">📑 Letter Paper</option>
+                    <option value="a5">📖 A5 Paper (Kindle)</option>
                   </select>
                 </div>
 
                 <div>
-                  <span className="options-card__label">5. Tác Giả / Watermark</span>
+                  <span className="options-card__label">
+                    5. Author / Watermark
+                  </span>
                   <input
                     type="text"
                     id="app-author-input"
                     className="options-select"
-                    placeholder="Tùy chọn..."
+                    placeholder="Optional..."
                     value={authorName}
                     onChange={(e) => setAuthorName(e.target.value)}
                     style={{ cursor: "text" }}
@@ -241,7 +275,9 @@ export default function App() {
 
               <div className="toggle-group">
                 <label className="toggle-item" htmlFor="app-user-check">
-                  <span className="toggle-item__label">Kèm câu hỏi của User</span>
+                  <span className="toggle-item__label">
+                    Include User Questions
+                  </span>
                   <input
                     type="checkbox"
                     id="app-user-check"
@@ -252,7 +288,7 @@ export default function App() {
                 </label>
 
                 <label className="toggle-item" htmlFor="app-pdfonly-check">
-                  <span className="toggle-item__label">Chỉ tải file PDF</span>
+                  <span className="toggle-item__label">Download PDF Only</span>
                   <input
                     type="checkbox"
                     id="app-pdfonly-check"
@@ -268,21 +304,25 @@ export default function App() {
             {phase !== "idle" && phase !== "error" && (
               <div className="phase-steps fade-in">
                 <PhaseStep
-                  label="Quét"
+                  label="Scan"
                   number="1"
                   done={isPhaseDone(0)}
                   active={isPhaseActive(0)}
                 />
-                <div className={`phase-connector${isPhaseDone(0) ? " phase-connector--done" : ""}`} />
+                <div
+                  className={`phase-connector${isPhaseDone(0) ? " phase-connector--done" : ""}`}
+                />
                 <PhaseStep
-                  label="Biên dịch"
+                  label="Compile"
                   number="2"
                   done={isPhaseDone(1)}
                   active={isPhaseActive(1)}
                 />
-                <div className={`phase-connector${isPhaseDone(1) ? " phase-connector--done" : ""}`} />
+                <div
+                  className={`phase-connector${isPhaseDone(1) ? " phase-connector--done" : ""}`}
+                />
                 <PhaseStep
-                  label="Tải về"
+                  label="Download"
                   number="3"
                   done={isPhaseDone(2)}
                   active={isPhaseActive(2)}
@@ -291,12 +331,16 @@ export default function App() {
             )}
 
             {/* CTA button when idle/ready to start */}
-            {(phase === "idle" || phase === "preparing" || phase === "processing-assets") && (
+            {(phase === "idle" ||
+              phase === "preparing" ||
+              phase === "processing-assets") && (
               <button
                 id="app-prepare-btn"
                 className={`button button--primary fade-in${phase === "preparing" || phase === "processing-assets" ? " button--loading" : ""}`}
                 type="button"
-                disabled={phase === "preparing" || phase === "processing-assets"}
+                disabled={
+                  phase === "preparing" || phase === "processing-assets"
+                }
                 onClick={() => {
                   void exportFlow.prepare({
                     templateId: selectedTemplate,
@@ -313,19 +357,19 @@ export default function App() {
                   <span className="btn-spinner" />
                 )}
                 {phase === "preparing"
-                  ? "Đang quét cuộc trò chuyện..."
+                  ? "Scanning conversation..."
                   : phase === "processing-assets"
-                    ? "Đang xử lý hình ảnh..."
+                    ? "Processing images..."
                     : exportPdfOnly
-                      ? "🚀 Chuẩn bị xuất PDF"
-                      : "🚀 Chuẩn bị xuất PDF + TEX"}
+                      ? "🚀 Prepare PDF Export"
+                      : "🚀 Prepare PDF + TEX Export"}
               </button>
             )}
 
             {exportFlow.phase === "permission-required" && (
               <section className="permission-card fade-in">
-                <strong>Cần quyền truy cập hình ảnh</strong>
-                <p>ChatTeX cần quyền tải hình từ:</p>
+                <strong>Image access required</strong>
+                <p>ChatTeX needs permission to download images from:</p>
                 <ul>
                   {exportFlow.missingOrigins.map((origin) => (
                     <li key={origin}>{origin}</li>
@@ -334,9 +378,11 @@ export default function App() {
                 <button
                   className="button button--secondary"
                   type="button"
-                  onClick={() => { void exportFlow.grantPermissions(); }}
+                  onClick={() => {
+                    void exportFlow.grantPermissions();
+                  }}
                 >
-                  Cấp quyền truy cập
+                  Grant Access
                 </button>
               </section>
             )}
@@ -344,7 +390,7 @@ export default function App() {
             {exportFlow.phase === "processing-assets" &&
               exportFlow.progress && (
                 <section className="progress-card fade-in">
-                  <strong>Đang xử lý hình ảnh</strong>
+                  <strong>Processing images</strong>
                   <p>
                     {exportFlow.progress.current} / {exportFlow.progress.total}
                   </p>
@@ -360,13 +406,17 @@ export default function App() {
               exportFlow.prepared &&
               exportFlow.processedAssets && (
                 <section className="export-ready fade-in">
-                  <strong>✅ Sẵn sàng biên dịch</strong>
+                  <strong>✅ Ready to compile</strong>
                   <div className="stat-row">
-                    <span className="stat-pill">💬 {exportFlow.prepared.messageCount} tin nhắn</span>
-                    <span className="stat-pill">🖼 {exportFlow.prepared.assets.length} hình ảnh</span>
+                    <span className="stat-pill">
+                      💬 {exportFlow.prepared.messageCount} messages
+                    </span>
+                    <span className="stat-pill">
+                      🖼 {exportFlow.prepared.assets.length} images
+                    </span>
                     {exportFlow.processedAssets.failures.length > 0 && (
                       <span className="stat-pill warning-text">
-                        ⚠️ {exportFlow.processedAssets.failures.length} lỗi
+                        ⚠️ {exportFlow.processedAssets.failures.length} errors
                       </span>
                     )}
                   </div>
@@ -374,17 +424,19 @@ export default function App() {
                     id="app-compile-btn"
                     className="button button--primary"
                     type="button"
-                    onClick={() => { void exportFlow.compile(); }}
+                    onClick={() => {
+                      void exportFlow.compile();
+                    }}
                   >
-                    🔨 Biên dịch XeLaTeX PDF
+                    🔨 Compile XeLaTeX PDF
                   </button>
                 </section>
               )}
 
             {exportFlow.phase === "compiling" && (
               <section className="progress-card fade-in">
-                <strong>Đang biên dịch XeLaTeX...</strong>
-                <p>Đang tạo file PDF, vui lòng chờ...</p>
+                <strong>Compiling with XeLaTeX...</strong>
+                <p>Creating the PDF, please wait...</p>
                 <div className="spinner-wrap">
                   <div className="spinner" />
                 </div>
@@ -393,19 +445,23 @@ export default function App() {
 
             {exportFlow.phase === "compiled" && exportFlow.pdfBase64 && (
               <section className="export-ready fade-in">
-                <strong>🎉 Biên dịch thành công!</strong>
+                <strong>🎉 Compilation successful!</strong>
                 <div className="stat-row">
                   <span className="stat-pill">
-                    📄 {formatFileSize(Math.floor(exportFlow.pdfBase64.length * 0.75))}
+                    📄{" "}
+                    {formatFileSize(
+                      Math.floor(exportFlow.pdfBase64.length * 0.75),
+                    )}
                   </span>
                 </div>
                 {compilerRejectedAssets.length > 0 && (
                   <>
                     <p className="warning-text">
-                      ⚠️ {compilerRejectedAssets.length} hình ảnh bị bỏ qua khỏi PDF.
+                      ⚠️ {compilerRejectedAssets.length} images were omitted
+                      from the PDF.
                     </p>
                     <details className="diagnostic-details">
-                      <summary>Hình ảnh bị bỏ qua</summary>
+                      <summary>Omitted images</summary>
                       <ul>
                         {compilerRejectedAssets.map((failure) => (
                           <li key={failure.id}>
@@ -420,17 +476,22 @@ export default function App() {
                   id="app-download-btn"
                   className="button button--success"
                   type="button"
-                  onClick={() => { void exportFlow.downloadAll(); }}
+                  onClick={() => {
+                    void exportFlow.downloadAll();
+                  }}
                 >
-                  ⬇️ {exportPdfOnly ? "Tải xuống PDF" : "Tải xuống PDF + TEX + ZIP"}
+                  ⬇️{" "}
+                  {exportPdfOnly
+                    ? "Download PDF"
+                    : "Download PDF + TEX + ZIP"}
                 </button>
               </section>
             )}
 
             {exportFlow.phase === "packaging" && (
               <section className="progress-card fade-in">
-                <strong>Đang đóng gói file...</strong>
-                <p>Tạo PDF, LaTeX và ZIP...</p>
+                <strong>Packaging files...</strong>
+                <p>Creating PDF, LaTeX, and ZIP files...</p>
                 <div className="spinner-wrap">
                   <div className="spinner" />
                 </div>
@@ -439,12 +500,16 @@ export default function App() {
 
             {exportFlow.phase === "downloaded" && (
               <section className="export-ready fade-in">
-                <strong>🎊 Tải xuống hoàn tất!</strong>
+                <strong>🎊 Download complete!</strong>
                 <div className="download-list">
                   {exportFlow.downloadedFiles.map((filename) => (
                     <div key={filename} className="download-list-item">
                       <span className="download-list-item__icon">
-                        {filename.endsWith(".pdf") ? "📄" : filename.endsWith(".tex") ? "📝" : "🗜️"}
+                        {filename.endsWith(".pdf")
+                          ? "📄"
+                          : filename.endsWith(".tex")
+                            ? "📝"
+                            : "🗜️"}
                       </span>
                       {filename}
                     </div>
@@ -453,17 +518,19 @@ export default function App() {
                 <button
                   className="button button--secondary"
                   type="button"
-                  onClick={() => { void exportFlow.prepare({
-                    templateId: selectedTemplate,
-                    paperColor: selectedColor,
-                    fontFamily: selectedFont,
-                    paperSize: selectedPaperSize,
-                    authorName,
-                    exportPdfOnly,
-                    includeUserMessages,
-                  }); }}
+                  onClick={() => {
+                    void exportFlow.prepare({
+                      templateId: selectedTemplate,
+                      paperColor: selectedColor,
+                      fontFamily: selectedFont,
+                      paperSize: selectedPaperSize,
+                      authorName,
+                      exportPdfOnly,
+                      includeUserMessages,
+                    });
+                  }}
                 >
-                  🔄 Xuất lại
+                  🔄 Export Again
                 </button>
               </section>
             )}
@@ -473,24 +540,26 @@ export default function App() {
                 <p className="collection-error">❌ {exportFlow.error}</p>
                 {!exportFlow.pdfBase64 && exportFlow.compileLog.trim() && (
                   <details className="diagnostic-details">
-                    <summary>Chi tiết lỗi XeLaTeX</summary>
+                    <summary>XeLaTeX Error Details</summary>
                     <pre className="compile-log">{exportFlow.compileLog}</pre>
                   </details>
                 )}
                 <button
                   className="button button--secondary"
                   type="button"
-                  onClick={() => { void exportFlow.prepare({
-                    templateId: selectedTemplate,
-                    paperColor: selectedColor,
-                    fontFamily: selectedFont,
-                    paperSize: selectedPaperSize,
-                    authorName,
-                    exportPdfOnly,
-                    includeUserMessages,
-                  }); }}
+                  onClick={() => {
+                    void exportFlow.prepare({
+                      templateId: selectedTemplate,
+                      paperColor: selectedColor,
+                      fontFamily: selectedFont,
+                      paperSize: selectedPaperSize,
+                      authorName,
+                      exportPdfOnly,
+                      includeUserMessages,
+                    });
+                  }}
                 >
-                  🔄 Thử lại
+                  🔄 Try Again
                 </button>
               </section>
             )}
@@ -501,15 +570,15 @@ export default function App() {
           <>
             <StatusCard
               variant="warning"
-              title="Không tìm thấy cuộc trò chuyện"
-              description="Mở một cuộc trò chuyện trên chatgpt.com và thử lại."
+              title="No conversation found"
+              description="Open a conversation on chatgpt.com and try again."
             />
             <button
               className="button button--secondary"
               type="button"
               onClick={() => void detectConversation()}
             >
-              🔄 Kiểm tra lại
+              🔄 Check Again
             </button>
           </>
         )}
@@ -518,15 +587,15 @@ export default function App() {
           <>
             <StatusCard
               variant="error"
-              title="Chưa kết nối được với ChatGPT"
-              description="Bấm F5 (Tải lại trang ChatGPT) để cập nhật kết nối mới nhất."
+              title="Unable to connect to ChatGPT"
+              description="Press F5 to reload the ChatGPT page and refresh the connection."
             />
             <button
               className="button button--secondary"
               type="button"
               onClick={() => void detectConversation()}
             >
-              🔄 Thử lại
+              🔄 Try Again
             </button>
           </>
         )}
@@ -570,9 +639,7 @@ function PhaseStep({ label, number, done, active }: PhaseStepProps) {
     <div
       className={`phase-step${done ? " phase-step--done" : active ? " phase-step--active" : ""}`}
     >
-      <div className="phase-step__dot">
-        {done ? "✓" : number}
-      </div>
+      <div className="phase-step__dot">{done ? "✓" : number}</div>
       <span className="phase-step__label">{label}</span>
     </div>
   );

@@ -186,7 +186,7 @@ async function sendMessageToOffscreenWithRetry<T>(
     }
   }
 
-  throw new Error("Trình biên dịch PDF chưa sẵn sàng. Vui lòng thử lại.");
+  throw new Error("The PDF compiler is not ready. Please try again.");
 }
 
 async function closeCompilerDocument(): Promise<void> {

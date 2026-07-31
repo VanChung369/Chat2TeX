@@ -128,16 +128,16 @@ export default defineContentScript({
       updateStatus: (statusText: string) => void,
       options: import("@/src/features/latex/types").LatexExportOptions,
     ) => {
-      updateStatus("1/3 Quét cuộc trò chuyện...");
+      updateStatus("1/3 Scanning conversation...");
       const conversation = await collectConversation();
       const prepared = prepareConversationExport(conversation, options);
 
       if (prepared.assets.length > 0) {
-        updateStatus(`1/3 Đang xử lý ${prepared.assets.length} hình ảnh...`);
+        updateStatus(`1/3 Processing ${prepared.assets.length} images...`);
       }
       const { files, failures } = await processInPageAssets(prepared);
 
-      updateStatus("2/3 Đang biên dịch XeLaTeX PDF...");
+      updateStatus("2/3 Compiling XeLaTeX PDF...");
       const compileResponse = (await sendRuntimeMessageWithRetry({
         type: "CHATTEX_COMPILE_LATEX",
         project: {
@@ -150,7 +150,7 @@ export default defineContentScript({
         throw new Error(compileResponse?.error || "XeLaTeX compilation failed.");
       }
 
-      updateStatus("3/3 Đang hoàn tất & tải về...");
+      updateStatus("3/3 Finalizing and downloading...");
       const downloadResponse = (await sendRuntimeMessageWithRetry({
         type: "CHATTEX_DOWNLOAD_EXPORT",
         payload: {
@@ -171,8 +171,8 @@ export default defineContentScript({
 
       updateStatus(
         options.exportPdfOnly
-          ? "✅ Hoàn tất! Đã tải về file PDF."
-          : "✅ Hoàn tất! Đã tải về PDF, TEX & ZIP.",
+          ? "✅ Complete! The PDF has been downloaded."
+          : "✅ Complete! PDF, TEX, and ZIP files have been downloaded.",
       );
     };
 
@@ -324,7 +324,7 @@ async function sendRuntimeMessageWithRetry<T>(
 
       if (isNoReceiver) {
         throw new Error(
-          "Extension vừa được reload/cập nhật. Vui lòng bấm F5 (Tải lại trang ChatGPT) để kích hoạt lại Chat2TeX.",
+          "The extension was reloaded or updated. Press F5 to reload the ChatGPT page and reactivate Chat2TeX.",
         );
       }
 
@@ -333,6 +333,6 @@ async function sendRuntimeMessageWithRetry<T>(
   }
 
   throw new Error(
-    "Extension vừa được reload/cập nhật. Vui lòng bấm F5 (Tải lại trang ChatGPT) để kích hoạt lại Chat2TeX.",
+    "The extension was reloaded or updated. Press F5 to reload the ChatGPT page and reactivate Chat2TeX.",
   );
 }

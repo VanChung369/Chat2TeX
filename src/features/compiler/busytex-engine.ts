@@ -41,8 +41,8 @@ export class BusyTexEngine implements LatexEngine {
     });
 
     /*
-     * true: BusyTeX chạy trong Web Worker,
-     * tránh khóa offscreen page.
+     * true: BusyTeX runs in a Web Worker so it does not block the
+     * offscreen page.
      */
     await runner.initialize(true);
 

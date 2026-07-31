@@ -393,7 +393,7 @@ describe("LatexGenerator", () => {
     expect(result.source).not.toContain("\\subsection[Overview]{Overview}");
   });
 
-  it("localizes Vietnamese prose and book labels", () => {
+  it("keeps English book labels while preserving Vietnamese prose", () => {
     const generator = new LatexGenerator();
     const decomposedVietnamese = "Tie\u0302\u0301ng Vie\u0323\u0302t";
 
@@ -418,17 +418,24 @@ describe("LatexGenerator", () => {
             },
           ],
         },
+        {
+          id: "user-2",
+          role: "user",
+          order: 1,
+          blocks: [],
+        },
       ],
     });
 
     expect(result.source).toContain("\\usepackage{polyglossia}");
     expect(result.source).toContain("\\setdefaultlanguage{vietnamese}");
     expect(result.source).toContain(
-      "\\renewcommand{\\contentsname}{Mục lục}",
+      "\\renewcommand{\\contentsname}{Contents}",
     );
-    expect(result.source).toContain("Câu hỏi");
-    expect(result.source).toContain("Nguồn:");
-    expect(result.source).toContain("Xuất bằng Chat2TeX");
+    expect(result.source).toContain("Reader's question");
+    expect(result.source).toContain("\\chatquestionsection{Question 2}");
+    expect(result.source).toContain("Source:");
+    expect(result.source).toContain("Exported with Chat2TeX");
     expect(result.source).toContain("Hướng dẫn tiếng Việt");
     expect(result.source).toContain("bằng Tiếng Việt.");
     expect(result.source).not.toContain(decomposedVietnamese);
@@ -821,4 +828,3 @@ describe("LatexGenerator", () => {
     expect(a5Paper).toContain("Chat2TeX User");
   });
 });
-
