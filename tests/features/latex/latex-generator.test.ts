@@ -262,6 +262,27 @@ describe("LatexGenerator", () => {
     expect(result.source).toContain("\\begin{readerquestion}");
   });
 
+  it("emits independently balanced hooks for the readerquestion environment", () => {
+    const generator = new LatexGenerator();
+
+    const source = generator.generate(createDocument()).source;
+    const marker = "\\newenvironment{readerquestion}[1]";
+    const definitionStart = source.indexOf(marker);
+    expect(definitionStart).toBeGreaterThanOrEqual(0);
+
+    const beginHook = readLatexGroup(
+      source,
+      definitionStart + marker.length,
+    );
+    expect(beginHook).not.toBeNull();
+
+    const endHook = readLatexGroup(source, beginHook!.end);
+    expect(endHook).not.toBeNull();
+    expect(source.slice(endHook!.end).trimStart()).toMatch(
+      /^\\newenvironment\{chattexiconrow\}/,
+    );
+  });
+
   it("renders user prompts as sections and assistant headings as children", () => {
     const generator = new LatexGenerator();
 
@@ -828,3 +849,42 @@ describe("LatexGenerator", () => {
     expect(a5Paper).toContain("Chat2TeX User");
   });
 });
+
+function readLatexGroup(
+  source: string,
+  offset: number,
+): { body: string; end: number } | null {
+  let cursor = offset;
+  while (/\s/.test(source[cursor] ?? "")) {
+    cursor += 1;
+  }
+  if (source[cursor] !== "{") {
+    return null;
+  }
+
+  const bodyStart = cursor + 1;
+  let depth = 1;
+  for (cursor = bodyStart; cursor < source.length; cursor += 1) {
+    const character = source[cursor];
+    const isEscaped =
+      cursor > 0 &&
+      source[cursor - 1] === "\\" &&
+      source[cursor - 2] !== "\\";
+    if (isEscaped) {
+      continue;
+    }
+    if (character === "{") {
+      depth += 1;
+    } else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return {
+          body: source.slice(bodyStart, cursor),
+          end: cursor + 1,
+        };
+      }
+    }
+  }
+
+  return null;
+}
