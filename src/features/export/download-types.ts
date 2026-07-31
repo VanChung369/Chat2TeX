@@ -10,6 +10,7 @@ export interface DownloadExportPayload {
   pdfBase64: string;
   files: ResolvedAssetFile[];
   failures: FailedExportAsset[];
+  exportPdfOnly?: boolean;
 }
 
 export interface DownloadArtifactDescriptor {

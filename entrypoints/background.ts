@@ -246,7 +246,11 @@ async function downloadExport(
 
   const downloads: StartedDownload[] = [];
 
-  for (const artifact of prepared.artifacts) {
+  const artifactsToDownload = payload.exportPdfOnly
+    ? prepared.artifacts.filter((artifact) => artifact.kind === "pdf")
+    : prepared.artifacts;
+
+  for (const artifact of artifactsToDownload) {
     downloads.push(await startArtifactDownload(artifact));
   }
 

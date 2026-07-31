@@ -17,6 +17,7 @@ export class InPageExporterUI {
   private selectedTemplate: LatexTemplateId = "academic";
   private selectedColor: LatexPaperColor = "default";
   private selectedFont: LatexFontFamily = "default";
+  private exportPdfOnly = false;
 
   constructor(private readonly runner?: InPageExportRunner) {}
 
@@ -137,6 +138,13 @@ export class InPageExporterUI {
         </div>
       </div>
 
+      <div style="display:flex; align-items:center; gap:6px; margin:2px 0;">
+        <input type="checkbox" id="chat2tex-pdfonly-check" style="cursor:pointer;" />
+        <label for="chat2tex-pdfonly-check" style="font-size:11px; font-weight:600; color:#2d3748; cursor:pointer;">
+          Chỉ tải file PDF (Bỏ qua .tex & .zip)
+        </label>
+      </div>
+
       <div id="chat2tex-status-msg" style="display:none; font-size:13px; font-weight:600; color:#1a202c; padding: 8px; background:#f7fafc; border-radius:6px; border: 1px solid #e2e8f0;"></div>
 
       <button id="chat2tex-start-btn" style="background:#2b6cb0; color:#ffffff; border:none; border-radius:6px; padding:10px; font-size:13px; font-weight:600; cursor:pointer; transition:background-color 0.15s ease;">
@@ -168,6 +176,14 @@ export class InPageExporterUI {
       fontEl.value = this.selectedFont;
       fontEl.onchange = () => {
         this.selectedFont = fontEl.value as LatexFontFamily;
+      };
+    }
+
+    const pdfOnlyEl = panel.querySelector("#chat2tex-pdfonly-check") as HTMLInputElement | null;
+    if (pdfOnlyEl) {
+      pdfOnlyEl.checked = this.exportPdfOnly;
+      pdfOnlyEl.onchange = () => {
+        this.exportPdfOnly = pdfOnlyEl.checked;
       };
     }
 
@@ -219,6 +235,7 @@ export class InPageExporterUI {
           templateId: this.selectedTemplate,
           paperColor: this.selectedColor,
           fontFamily: this.selectedFont,
+          exportPdfOnly: this.exportPdfOnly,
         });
       } else {
         updateStatus("✅ Export complete! Check downloads folder.");

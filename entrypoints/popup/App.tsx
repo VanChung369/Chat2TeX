@@ -28,6 +28,7 @@ export default function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<import("@/src/features/latex/types").LatexTemplateId>("academic");
   const [selectedColor, setSelectedColor] = useState<import("@/src/features/latex/types").LatexPaperColor>("default");
   const [selectedFont, setSelectedFont] = useState<import("@/src/features/latex/types").LatexFontFamily>("default");
+  const [exportPdfOnly, setExportPdfOnly] = useState(false);
   const exportFlow = useExportFlow();
 
   const compilerRejectedAssets =
@@ -200,6 +201,19 @@ export default function App() {
                   </select>
                 </div>
               </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", margin: "2px 0" }}>
+                <input
+                  type="checkbox"
+                  id="app-pdfonly-check"
+                  checked={exportPdfOnly}
+                  onChange={(e) => setExportPdfOnly(e.target.checked)}
+                  style={{ cursor: "pointer" }}
+                />
+                <label htmlFor="app-pdfonly-check" style={{ fontSize: "11px", fontWeight: 600, color: "#2d3748", cursor: "pointer" }}>
+                  Chỉ tải file PDF (Bỏ qua file .tex & .zip)
+                </label>
+              </div>
             </div>
 
             <button
@@ -214,12 +228,15 @@ export default function App() {
                   templateId: selectedTemplate,
                   paperColor: selectedColor,
                   fontFamily: selectedFont,
+                  exportPdfOnly,
                 });
               }}
             >
               {exportFlow.phase === "preparing"
                 ? "Scanning conversation..."
-                : "Prepare PDF + TEX"}
+                : exportPdfOnly
+                  ? "Prepare PDF Export"
+                  : "Prepare PDF + TEX"}
             </button>
 
             {exportFlow.phase === "permission-required" && (

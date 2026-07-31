@@ -160,6 +160,7 @@ export default defineContentScript({
           pdfBase64: compileResponse.pdfBase64,
           files,
           failures,
+          exportPdfOnly: options.exportPdfOnly,
         },
       })) as { ok: boolean; error?: string };
 
@@ -167,7 +168,11 @@ export default defineContentScript({
         throw new Error(downloadResponse?.error || "Download packaging failed.");
       }
 
-      updateStatus("✅ Hoàn tất! Đã tải về PDF, TEX & ZIP.");
+      updateStatus(
+        options.exportPdfOnly
+          ? "✅ Hoàn tất! Đã tải về file PDF."
+          : "✅ Hoàn tất! Đã tải về PDF, TEX & ZIP.",
+      );
     };
 
     new InPageExporterUI(runInPageExport).mount();

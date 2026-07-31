@@ -37,6 +37,7 @@ export interface LatexExportOptions {
   templateId?: LatexTemplateId;
   paperColor?: LatexPaperColor;
   fontFamily?: LatexFontFamily;
+  exportPdfOnly?: boolean;
 }
 
 export interface LatexTemplateDescriptor {

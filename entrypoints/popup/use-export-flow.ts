@@ -66,6 +66,7 @@ export function useExportFlow() {
   const [compileLog, setCompileLog] = useState("");
 
   const [downloadedFiles, setDownloadedFiles] = useState<string[]>([]);
+  const [exportOptions, setExportOptions] = useState<import("@/src/features/latex/types").LatexExportOptions | null>(null);
 
   async function prepare(
     optionsOrTemplateId?:
@@ -77,6 +78,7 @@ export function useExportFlow() {
         ? { templateId: optionsOrTemplateId }
         : optionsOrTemplateId;
 
+    setExportOptions(options ?? null);
     setPhase("preparing");
     setError(null);
     setProgress(null);
@@ -290,8 +292,8 @@ export function useExportFlow() {
           pdfBase64,
 
           files: processedAssets.files,
-
           failures: processedAssets.failures,
+          exportPdfOnly: exportOptions?.exportPdfOnly,
         },
       };
 
