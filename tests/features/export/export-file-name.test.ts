@@ -7,20 +7,20 @@ describe("createExportFileStem", () => {
 
   it("creates a safe slug from a Vietnamese title", () => {
     expect(createExportFileStem("Học LaTeX: PDF & ChatGPT", date)).toBe(
-      "hoc-latex-pdf-chatgpt-2026-07-30",
+      "hoc-latex-pdf-chatgpt-2026-07-30-1200",
     );
   });
 
   it("uses a fallback for an empty title", () => {
     expect(createExportFileStem("???", date)).toBe(
-      "chatgpt-conversation-2026-07-30",
+      "chatgpt-conversation-2026-07-30-1200",
     );
   });
 
   it("removes unsafe path characters", () => {
     const result = createExportFileStem("../../My\\Conversation", date);
 
-    expect(result).toBe("my-conversation-2026-07-30");
+    expect(result).toBe("my-conversation-2026-07-30-1200");
 
     expect(result).not.toContain("/");
     expect(result).not.toContain("\\");

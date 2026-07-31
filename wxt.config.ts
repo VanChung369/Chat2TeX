@@ -11,7 +11,7 @@ export default defineConfig({
     description:
       "Export ChatGPT conversations to beautifully formatted PDF and LaTeX files.",
 
-    permissions: ["storage", "downloads", "offscreen"],
+    permissions: ["storage", "downloads", "offscreen", "scripting"],
 
     host_permissions: [
       "https://chatgpt.com/*",

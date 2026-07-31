@@ -177,6 +177,7 @@ async function sendMessageToOffscreenWithRetry<T>(
           error.message.includes("Extension context invalidated"));
 
       if (isNoReceiver && attempt < maxRetries - 1) {
+        await closeCompilerDocument();
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
@@ -188,12 +189,27 @@ async function sendMessageToOffscreenWithRetry<T>(
   throw new Error("Trình biên dịch PDF chưa sẵn sàng. Vui lòng thử lại.");
 }
 
+async function closeCompilerDocument(): Promise<void> {
+  try {
+    const documentUrl = browser.runtime.getURL("/compiler.html");
+    const contexts = await browser.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [documentUrl],
+    });
+
+    if (contexts.length > 0) {
+      await browser.offscreen.closeDocument();
+    }
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
 async function ensureCompilerDocument(): Promise<void> {
   const documentUrl = browser.runtime.getURL("/compiler.html");
 
   const contexts = await browser.runtime.getContexts({
     contextTypes: ["OFFSCREEN_DOCUMENT"],
-
     documentUrls: [documentUrl],
   });
 
@@ -205,9 +221,7 @@ async function ensureCompilerDocument(): Promise<void> {
     creatingOffscreenDocument = browser.offscreen
       .createDocument({
         url: "compiler.html",
-
         reasons: [browser.offscreen.Reason.WORKERS],
-
         justification:
           "Run the XeLaTeX WebAssembly compiler without blocking the popup.",
       })

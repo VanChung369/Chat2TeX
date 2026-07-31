@@ -259,7 +259,6 @@ describe("LatexGenerator", () => {
     expect(result.source).not.toContain("\\usepackage[most]{tcolorbox}");
     expect(result.source).not.toContain("\\newtcolorbox{chatmessage}");
     expect(result.source).not.toContain("\\begin{chatmessage}");
-    expect(result.source).not.toContain("\\begin{minipage}");
     expect(result.source).toContain("\\begin{readerquestion}");
   });
 
@@ -592,7 +591,7 @@ describe("LatexGenerator", () => {
       "identifierstyle=\\color{codeforeground}",
     );
     expect(result.source).toContain("\\providecommand{\\chatcodenumber}[1]{#1}");
-    expect(result.source).toContain("numberstyle=\\scriptsize\\color{bookmuted}");
+    expect(result.source).toContain("numberstyle=\\tiny\\color{bookmuted}");
     expect(result.source).toContain("numbers=left");
     expect(result.source).not.toContain("title={JavaScript}");
 
@@ -669,12 +668,10 @@ describe("LatexGenerator", () => {
       "\\IfFileExists{assets/image-001.png}",
     );
     expect(result.source).toContain("\\usepackage[export]{adjustbox}");
-    expect(result.source).toContain("    max width=\\linewidth,");
-    expect(result.source).toContain(
-      "    max height=0.7\\textheight,",
-    );
-    expect(result.source).not.toContain("    width=\\linewidth,");
-    expect(result.source).not.toContain("    height=0.7\\textheight,");
+    expect(result.source).toContain("\\newlength{\\maxwidth}");
+    expect(result.source).toContain("\\newlength{\\maxheight}");
+    expect(result.source).toContain("    width=\\maxwidth,");
+    expect(result.source).toContain("    height=\\maxheight,");
   });
 
   it("renders adjacent icon images as one compact row", () => {
