@@ -86,11 +86,25 @@ export class LatexGenerator {
 
     const labels = BOOK_LABELS[language];
 
+    const includeUserMessages = options.includeUserMessages ?? true;
+    const excludedSet = new Set(options.excludedMessageIds ?? []);
+
+    const filteredMessages = [...document.messages]
+      .sort((first, second) => first.order - second.order)
+      .filter((message) => {
+        if (excludedSet.has(message.id)) {
+          return false;
+        }
+        if (!includeUserMessages && message.role === "user") {
+          return false;
+        }
+        return true;
+      });
+
     let questionNumber = 0;
     let hasQuestionSection = false;
 
-    const body = [...document.messages]
-      .sort((first, second) => first.order - second.order)
+    const body = filteredMessages
       .map((message) => {
         if (message.role === "user") {
           questionNumber += 1;
@@ -369,18 +383,16 @@ export class LatexGenerator {
       "\\setlist{itemsep=0.25em, topsep=0.45em, parsep=0pt}",
       "",
       "\\newenvironment{readerquestion}[1]{",
-      "  \\par\\vspace{1em}",
-      "  \\noindent",
-      "  \\fcolorbox{questionaccent}{questionbg}{",
-      "    \\parbox{\\dimexpr\\linewidth-2\\fboxsep-2\\fboxrule\\relax}{",
-      "      \\vspace{0.2em}",
-      "      {\\sffamily\\small\\bfseries\\color{questionaccent} #1}",
-      "      \\vspace{0.4em}\\hrule height 0.4pt\\vspace{0.5em}",
-      "      \\sffamily\\color{questiontext}",
-      "    }",
-      "  }",
-      "  \\par\\vspace{1.2em}",
+      "  \\par\\vspace{0.8em}",
+      "  \\noindent\\textcolor{questionaccent}{\\rule{\\linewidth}{1.2pt}}",
+      "  \\par\\vspace{0.3em}",
+      "  {\\sffamily\\small\\bfseries\\color{questionaccent} #1}",
+      "  \\par\\vspace{0.3em}",
+      "  \\itshape\\color{questiontext}",
       "}{",
+      "  \\par\\vspace{0.4em}",
+      "  \\noindent\\textcolor{bookrule}{\\rule{\\linewidth}{0.4pt}}",
+      "  \\par\\vspace{0.8em}",
       "}",
       "",
       "\\newenvironment{chattexiconrow}{%",
@@ -1441,7 +1453,7 @@ function renderVietnameseListingsMappings(): string {
     .join(" ");
 }
 
-function truncateAtWordBoundary(value: string, limit: number): string {
+export function truncateAtWordBoundary(value: string, limit: number): string {
   const normalized = value.normalize("NFC").replace(/\s+/gu, " ").trim();
   const characters = Array.from(normalized);
 

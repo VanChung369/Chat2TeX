@@ -167,12 +167,14 @@ async function sendMessageToOffscreenWithRetry<T>(
 ): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
+      await ensureCompilerDocument();
       return (await browser.runtime.sendMessage(message)) as T;
     } catch (error) {
       const isNoReceiver =
         error instanceof Error &&
         (error.message.includes("Could not establish connection") ||
-          error.message.includes("Receiving end does not exist"));
+          error.message.includes("Receiving end does not exist") ||
+          error.message.includes("Extension context invalidated"));
 
       if (isNoReceiver && attempt < maxRetries - 1) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -183,7 +185,7 @@ async function sendMessageToOffscreenWithRetry<T>(
     }
   }
 
-  throw new Error("Offscreen document failed to respond.");
+  throw new Error("Trình biên dịch PDF chưa sẵn sàng. Vui lòng thử lại.");
 }
 
 async function ensureCompilerDocument(): Promise<void> {

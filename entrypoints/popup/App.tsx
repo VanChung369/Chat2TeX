@@ -29,6 +29,7 @@ export default function App() {
   const [selectedColor, setSelectedColor] = useState<import("@/src/features/latex/types").LatexPaperColor>("default");
   const [selectedFont, setSelectedFont] = useState<import("@/src/features/latex/types").LatexFontFamily>("default");
   const [exportPdfOnly, setExportPdfOnly] = useState(false);
+  const [includeUserMessages, setIncludeUserMessages] = useState(true);
   const exportFlow = useExportFlow();
 
   const compilerRejectedAssets =
@@ -58,10 +59,26 @@ export default function App() {
         type: CHATTEX_EXTRACT_CONVERSATION,
       };
 
-      const response = (await browser.tabs.sendMessage(
-        activeTab.id,
-        request,
-      )) as ChatTexExtractConversationResponse;
+      let response: ChatTexExtractConversationResponse | null = null;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+          response = (await browser.tabs.sendMessage(
+            activeTab.id,
+            request,
+          )) as ChatTexExtractConversationResponse;
+          break;
+        } catch (err) {
+          if (attempt < 9) {
+            await new Promise((r) => setTimeout(r, 250));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!response) {
+        throw new Error("No response from ChatGPT content script.");
+      }
 
       setConversation({
         title: response.title,
@@ -202,17 +219,32 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", margin: "2px 0" }}>
-                <input
-                  type="checkbox"
-                  id="app-pdfonly-check"
-                  checked={exportPdfOnly}
-                  onChange={(e) => setExportPdfOnly(e.target.checked)}
-                  style={{ cursor: "pointer" }}
-                />
-                <label htmlFor="app-pdfonly-check" style={{ fontSize: "11px", fontWeight: 600, color: "#2d3748", cursor: "pointer" }}>
-                  Chỉ tải file PDF (Bỏ qua file .tex & .zip)
-                </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", margin: "2px 0" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <input
+                    type="checkbox"
+                    id="app-user-check"
+                    checked={includeUserMessages}
+                    onChange={(e) => setIncludeUserMessages(e.target.checked)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  <label htmlFor="app-user-check" style={{ fontSize: "11px", fontWeight: 600, color: "#2d3748", cursor: "pointer" }}>
+                    Kèm câu hỏi của User
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <input
+                    type="checkbox"
+                    id="app-pdfonly-check"
+                    checked={exportPdfOnly}
+                    onChange={(e) => setExportPdfOnly(e.target.checked)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  <label htmlFor="app-pdfonly-check" style={{ fontSize: "11px", fontWeight: 600, color: "#2d3748", cursor: "pointer" }}>
+                    Chỉ tải file PDF (Bỏ qua file .tex & .zip)
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -229,6 +261,7 @@ export default function App() {
                   paperColor: selectedColor,
                   fontFamily: selectedFont,
                   exportPdfOnly,
+                  includeUserMessages,
                 });
               }}
             >
@@ -430,8 +463,8 @@ export default function App() {
           <>
             <StatusCard
               variant="error"
-              title="Unable to inspect this tab"
-              description="Reload the page and try again."
+              title="Chưa kết nối được với trang ChatGPT"
+              description="Vui lòng bấm F5 (Tải lại trang ChatGPT) để cập nhật kết nối mới nhất."
             />
 
             <button
@@ -439,7 +472,7 @@ export default function App() {
               type="button"
               onClick={() => void detectConversation()}
             >
-              Retry
+              🔄 Thử lại
             </button>
           </>
         )}

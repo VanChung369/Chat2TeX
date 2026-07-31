@@ -796,4 +796,18 @@ describe("LatexGenerator", () => {
     expect(dark).toContain("\\definecolor{bookpaper}{HTML}{18181B}");
     expect(dark).toContain("\\renewcommand{\\familydefault}{\\ttdefault}");
   });
+
+  it("supports excluding user messages and specific message IDs", () => {
+    const generator = new LatexGenerator();
+    const doc = createDocument();
+
+    const noUser = generator.generate(doc, { includeUserMessages: false }).source;
+    expect(noUser).not.toContain("\\begin{readerquestion}");
+
+    const msgIdToOmit = doc.messages[0]?.id;
+    if (msgIdToOmit) {
+      const omitted = generator.generate(doc, { excludedMessageIds: [msgIdToOmit] }).source;
+      expect(omitted).not.toContain("Explain binary search with O(log n)");
+    }
+  });
 });

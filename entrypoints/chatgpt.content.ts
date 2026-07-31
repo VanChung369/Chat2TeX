@@ -28,6 +28,7 @@ import {
 } from "@/src/shared/messages";
 
 import { InPageExporterUI } from "@/src/features/chat/in-page-exporter";
+import { truncateAtWordBoundary } from "@/src/features/latex/latex-generator";
 import type { PreparedExport, ProcessedExportAssets } from "@/src/features/export/types";
 import type { ResolveAssetResult } from "@/src/features/assets/types";
 
@@ -175,7 +176,23 @@ export default defineContentScript({
       );
     };
 
-    new InPageExporterUI(runInPageExport).mount();
+    new InPageExporterUI(runInPageExport, async () => {
+      try {
+        const conv = await collectConversation();
+        return conv.messages.map((m) => ({
+          id: m.id,
+          role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+          snippet: truncateAtWordBoundary(m.text, 60) || "Empty message",
+        }));
+      } catch {
+        const fallbackConv = adapter.extractConversation();
+        return fallbackConv.messages.map((m) => ({
+          id: m.id,
+          role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+          snippet: truncateAtWordBoundary(m.text, 60) || "Empty message",
+        }));
+      }
+    }).mount();
 
     browser.runtime.onMessage.addListener(
       (message: unknown, _sender, sendResponse) => {
@@ -287,8 +304,8 @@ function readProtocol(value: string): string {
 
 async function sendRuntimeMessageWithRetry<T>(
   message: unknown,
-  maxRetries = 30,
-  delayMs = 350,
+  maxRetries = 15,
+  delayMs = 300,
 ): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
@@ -297,16 +314,25 @@ async function sendRuntimeMessageWithRetry<T>(
       const isNoReceiver =
         error instanceof Error &&
         (error.message.includes("Could not establish connection") ||
-          error.message.includes("Receiving end does not exist"));
+          error.message.includes("Receiving end does not exist") ||
+          error.message.includes("Extension context invalidated"));
 
       if (isNoReceiver && attempt < maxRetries - 1) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
 
+      if (isNoReceiver) {
+        throw new Error(
+          "Extension vừa được reload/cập nhật. Vui lòng bấm F5 (Tải lại trang ChatGPT) để kích hoạt lại Chat2TeX.",
+        );
+      }
+
       throw error;
     }
   }
 
-  throw new Error("Extension background script failed to respond.");
+  throw new Error(
+    "Extension vừa được reload/cập nhật. Vui lòng bấm F5 (Tải lại trang ChatGPT) để kích hoạt lại Chat2TeX.",
+  );
 }

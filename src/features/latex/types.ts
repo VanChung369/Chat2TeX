@@ -38,6 +38,8 @@ export interface LatexExportOptions {
   paperColor?: LatexPaperColor;
   fontFamily?: LatexFontFamily;
   exportPdfOnly?: boolean;
+  includeUserMessages?: boolean;
+  excludedMessageIds?: string[];
 }
 
 export interface LatexTemplateDescriptor {

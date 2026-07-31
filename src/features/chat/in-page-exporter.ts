@@ -5,6 +5,14 @@ import type {
   LatexTemplateId,
 } from "@/src/features/latex/types";
 
+export interface ChatMessageSummary {
+  id: string;
+  role: "user" | "assistant";
+  snippet: string;
+}
+
+export type MessageFetcher = () => Promise<ChatMessageSummary[]> | ChatMessageSummary[];
+
 export type InPageExportRunner = (
   updateStatus: (statusText: string) => void,
   options: LatexExportOptions,
@@ -18,8 +26,15 @@ export class InPageExporterUI {
   private selectedColor: LatexPaperColor = "default";
   private selectedFont: LatexFontFamily = "default";
   private exportPdfOnly = false;
+  private includeUserMessages = true;
+  private excludedMessageIds = new Set<string>();
+  private loadedMessages: ChatMessageSummary[] = [];
+  private isFetchingMessages = false;
 
-  constructor(private readonly runner?: InPageExportRunner) {}
+  constructor(
+    private readonly runner?: InPageExportRunner,
+    private readonly getMessages?: MessageFetcher,
+  ) {}
 
   mount(): void {
     if (document.getElementById("chat2tex-inpage-root")) {
@@ -81,7 +96,7 @@ export class InPageExporterUI {
     panel.style.position = "absolute";
     panel.style.bottom = "56px";
     panel.style.right = "0";
-    panel.style.width = "340px";
+    panel.style.width = "350px";
     panel.style.backgroundColor = "#ffffff";
     panel.style.color = "#1a202c";
     panel.style.border = "1px solid #e2e8f0";
@@ -138,11 +153,24 @@ export class InPageExporterUI {
         </div>
       </div>
 
-      <div style="display:flex; align-items:center; gap:6px; margin:2px 0;">
-        <input type="checkbox" id="chat2tex-pdfonly-check" style="cursor:pointer;" />
-        <label for="chat2tex-pdfonly-check" style="font-size:11px; font-weight:600; color:#2d3748; cursor:pointer;">
-          Chỉ tải file PDF (Bỏ qua .tex & .zip)
-        </label>
+      <div style="display:flex; flex-direction:column; gap:4px; margin:2px 0;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="chat2tex-user-check" style="cursor:pointer;" />
+          <label for="chat2tex-user-check" style="font-size:11px; font-weight:600; color:#2d3748; cursor:pointer;">
+            Kèm câu hỏi của User
+          </label>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="chat2tex-pdfonly-check" style="cursor:pointer;" />
+          <label for="chat2tex-pdfonly-check" style="font-size:11px; font-weight:600; color:#2d3748; cursor:pointer;">
+            Chỉ tải file PDF (Bỏ qua .tex & .zip)
+          </label>
+        </div>
+      </div>
+
+      <div id="chat2tex-msg-list-container" style="font-size:11px; color:#718096;">
+        Đang quét danh sách tin nhắn...
       </div>
 
       <div id="chat2tex-status-msg" style="display:none; font-size:13px; font-weight:600; color:#1a202c; padding: 8px; background:#f7fafc; border-radius:6px; border: 1px solid #e2e8f0;"></div>
@@ -179,6 +207,14 @@ export class InPageExporterUI {
       };
     }
 
+    const userCheckEl = panel.querySelector("#chat2tex-user-check") as HTMLInputElement | null;
+    if (userCheckEl) {
+      userCheckEl.checked = this.includeUserMessages;
+      userCheckEl.onchange = () => {
+        this.includeUserMessages = userCheckEl.checked;
+      };
+    }
+
     const pdfOnlyEl = panel.querySelector("#chat2tex-pdfonly-check") as HTMLInputElement | null;
     if (pdfOnlyEl) {
       pdfOnlyEl.checked = this.exportPdfOnly;
@@ -201,6 +237,73 @@ export class InPageExporterUI {
         this.statusPanel = null;
       };
     }
+
+    void this.fetchFullMessages();
+  }
+
+  private async fetchFullMessages(): Promise<void> {
+    if (!this.getMessages || this.isFetchingMessages) return;
+    this.isFetchingMessages = true;
+
+    try {
+      const res = this.getMessages();
+      const msgs = res instanceof Promise ? await res : res;
+      if (msgs && msgs.length > 0) {
+        this.loadedMessages = msgs;
+        this.renderMessageListContainer();
+      }
+    } catch {
+      // ignore
+    } finally {
+      this.isFetchingMessages = false;
+    }
+  }
+
+  private renderMessageListContainer(): void {
+    const container = this.statusPanel?.querySelector("#chat2tex-msg-list-container") as HTMLElement | null;
+    if (!container) return;
+
+    const messages = this.loadedMessages;
+    container.innerHTML = `
+      <details style="border:1px solid #cbd5e0; border-radius:6px; padding:6px; background:#f8fafc;" open>
+        <summary style="font-size:11px; font-weight:600; color:#2b6cb0; cursor:pointer;">
+          📋 Chọn lọc từng tin nhắn (${messages.length} tin)
+        </summary>
+        <div style="max-height:130px; overflow-y:auto; margin-top:6px; display:flex; flex-direction:column; gap:6px;">
+          ${messages
+            .map(
+              (m, idx) => `
+            <label style="display:flex; align-items:flex-start; gap:6px; font-size:11px; color:#2d3748; cursor:pointer;">
+              <input type="checkbox" class="chat2tex-msg-item" data-id="${m.id}" ${
+                this.excludedMessageIds.has(m.id) ? "" : "checked"
+              } style="margin-top:2px; cursor:pointer;" />
+              <span style="line-height:1.3;">
+                <strong style="color:${
+                  m.role === "user" ? "#15803d" : "#2b6cb0"
+                };">#${idx + 1} [${m.role === "user" ? "User" : "AI"}]:</strong> ${escapeHtmlSnippet(
+                m.snippet,
+              )}
+              </span>
+            </label>
+          `,
+            )
+            .join("")}
+        </div>
+      </details>
+    `;
+
+    const msgCheckboxes = container.querySelectorAll<HTMLInputElement>(".chat2tex-msg-item");
+    msgCheckboxes.forEach((cb) => {
+      cb.onchange = () => {
+        const id = cb.dataset.id;
+        if (!id) return;
+        if (cb.checked) {
+          this.excludedMessageIds.delete(id);
+        } else {
+          this.excludedMessageIds.add(id);
+        }
+      };
+    });
   }
 
   private async triggerExport(): Promise<void> {
@@ -236,13 +339,24 @@ export class InPageExporterUI {
           paperColor: this.selectedColor,
           fontFamily: this.selectedFont,
           exportPdfOnly: this.exportPdfOnly,
+          includeUserMessages: this.includeUserMessages,
+          excludedMessageIds: Array.from(this.excludedMessageIds),
         });
       } else {
         updateStatus("✅ Export complete! Check downloads folder.");
       }
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : "Export failed.";
-      updateStatus(`❌ ${errMsg}`);
+      const rawMsg = error instanceof Error ? error.message : "Export failed.";
+      const isConnectionErr =
+        rawMsg.includes("Could not establish connection") ||
+        rawMsg.includes("Receiving end does not exist") ||
+        rawMsg.includes("Extension context invalidated");
+
+      const displayMsg = isConnectionErr
+        ? "⚠️ Extension vừa được cập nhật. Vui lòng bấm F5 (Tải lại trang ChatGPT) rồi thử lại."
+        : `❌ ${rawMsg}`;
+
+      updateStatus(displayMsg);
     } finally {
       this.isProcessing = false;
       if (startBtn) {
@@ -255,4 +369,13 @@ export class InPageExporterUI {
       if (fontEl) fontEl.disabled = false;
     }
   }
+}
+
+function escapeHtmlSnippet(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

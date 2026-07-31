@@ -239,7 +239,7 @@ export function useExportFlow() {
         },
       };
 
-      const response = (await browser.runtime.sendMessage(
+      const response = (await sendRuntimeMessageWithRetry(
         request,
       )) as ChatTexCompileInOffscreenResponse;
 
@@ -297,7 +297,7 @@ export function useExportFlow() {
         },
       };
 
-      const response = (await browser.runtime.sendMessage(
+      const response = (await sendRuntimeMessageWithRetry(
         request,
       )) as ChatTexDownloadExportResponse;
 
@@ -348,7 +348,7 @@ async function resolveAsset(
       asset,
     };
 
-    const pageResult = (await browser.tabs.sendMessage(
+    const pageResult = (await sendTabMessageWithRetry(
       tabId,
       readRequest,
     )) as ChatTexReadPageImageResponse;
@@ -363,7 +363,7 @@ async function resolveAsset(
       data: pageResult.data,
     };
 
-    return browser.runtime.sendMessage(
+    return sendRuntimeMessageWithRetry(
       convertRequest,
     ) as Promise<ResolveAssetResult>;
   }
@@ -373,7 +373,7 @@ async function resolveAsset(
     asset,
   };
 
-  return browser.runtime.sendMessage(request) as Promise<ResolveAssetResult>;
+  return sendRuntimeMessageWithRetry(request) as Promise<ResolveAssetResult>;
 }
 
 async function findMissingOrigins(origins: string[]): Promise<string[]> {
@@ -469,4 +469,30 @@ async function sendTabMessageWithRetry<T>(
   }
 
   throw new Error("Tốc độ phản hồi của trang ChatGPT quá chậm. Vui lòng tải lại trang.");
+}
+
+async function sendRuntimeMessageWithRetry<T>(
+  message: unknown,
+  maxRetries = 30,
+  delayMs = 350,
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+    try {
+      return (await browser.runtime.sendMessage(message)) as T;
+    } catch (error) {
+      const isNoReceiver =
+        error instanceof Error &&
+        (error.message.includes("Could not establish connection") ||
+          error.message.includes("Receiving end does not exist"));
+
+      if (isNoReceiver && attempt < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Tự động kết nối với Extension thất bại. Vui lòng thử lại.");
 }
