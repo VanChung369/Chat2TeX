@@ -579,12 +579,14 @@ export class InPageExporterUI {
 
   private setProcessingState(processing: boolean): void {
     const startBtn = this.statusPanel?.querySelector<HTMLButtonElement>("#chat2tex-start-btn");
+    const closeBtn = this.statusPanel?.querySelector<HTMLElement>("#chat2tex-close");
     const selects = this.statusPanel?.querySelectorAll<HTMLSelectElement>("select");
+    const inputs = this.statusPanel?.querySelectorAll<HTMLInputElement>("input");
 
     if (startBtn) {
       startBtn.disabled = processing;
       if (processing) {
-        startBtn.innerHTML = `<span class="c2t-spinner"></span> Exporting...`;
+        startBtn.innerHTML = `<span class="c2t-spinner"></span> Exporting PDF...`;
       } else {
         startBtn.innerHTML = this.exportPdfOnly
           ? "🚀 Start PDF Export"
@@ -592,7 +594,13 @@ export class InPageExporterUI {
       }
     }
 
+    if (closeBtn) {
+      closeBtn.style.pointerEvents = processing ? "none" : "auto";
+      closeBtn.style.opacity = processing ? "0.3" : "1";
+    }
+
     selects?.forEach((s) => { s.disabled = processing; });
+    inputs?.forEach((i) => { i.disabled = processing; });
   }
 
   private async triggerExport(): Promise<void> {

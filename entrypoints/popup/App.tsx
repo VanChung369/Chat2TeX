@@ -121,6 +121,13 @@ export default function App() {
   const isPhaseActive = (idx: number) =>
     phaseIndex === idx && phase !== "idle" && phase !== "error";
 
+  const isProcessing =
+    exportFlow.phase === "preparing" ||
+    exportFlow.phase === "permission-required" ||
+    exportFlow.phase === "processing-assets" ||
+    exportFlow.phase === "compiling" ||
+    exportFlow.phase === "packaging";
+
   return (
     <main className="popup">
       <header className="popup__header">
@@ -170,6 +177,7 @@ export default function App() {
                 <select
                   id="app-template-select"
                   className="options-select"
+                  disabled={isProcessing}
                   value={selectedTemplate}
                   onChange={(e) =>
                     setSelectedTemplate(
@@ -199,6 +207,7 @@ export default function App() {
                   <select
                     id="app-color-select"
                     className="options-select"
+                    disabled={isProcessing}
                     value={selectedColor}
                     onChange={(e) =>
                       setSelectedColor(
@@ -221,6 +230,7 @@ export default function App() {
                   <select
                     id="app-font-select"
                     className="options-select"
+                    disabled={isProcessing}
                     value={selectedFont}
                     onChange={(e) =>
                       setSelectedFont(
@@ -243,6 +253,7 @@ export default function App() {
                   <select
                     id="app-size-select"
                     className="options-select"
+                    disabled={isProcessing}
                     value={selectedPaperSize}
                     onChange={(e) =>
                       setSelectedPaperSize(
@@ -265,10 +276,11 @@ export default function App() {
                     type="text"
                     id="app-author-input"
                     className="options-select"
+                    disabled={isProcessing}
                     placeholder="Optional..."
                     value={authorName}
                     onChange={(e) => setAuthorName(e.target.value)}
-                    style={{ cursor: "text" }}
+                    style={{ cursor: isProcessing ? "not-allowed" : "text" }}
                   />
                 </div>
               </div>
@@ -281,6 +293,7 @@ export default function App() {
                   <input
                     type="checkbox"
                     id="app-user-check"
+                    disabled={isProcessing}
                     checked={includeUserMessages}
                     onChange={(e) => setIncludeUserMessages(e.target.checked)}
                   />
@@ -292,6 +305,7 @@ export default function App() {
                   <input
                     type="checkbox"
                     id="app-pdfonly-check"
+                    disabled={isProcessing}
                     checked={exportPdfOnly}
                     onChange={(e) => setExportPdfOnly(e.target.checked)}
                   />
